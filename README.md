@@ -12,6 +12,7 @@ This template provides:
 - **ESLint + Prettier** - Code quality and formatting
 - **Docker** - Containerization support
 - **Example Tool** - Simple echo tool to demonstrate MCP tool implementation
+- **OAuth 2.1 Compatible** - Optional OAuth implementation (can use Pomerium for external auth or built-in server implementation)
 
 ## Getting Started
 
@@ -183,6 +184,21 @@ server.registerTool(
   },
 );
 ```
+
+## Authentication & Authorization
+
+### OAuth 2.1 Support
+
+This template supports **optional** OAuth 2.1 authentication with two approaches:
+
+1. **External OAuth (Recommended)** - Use Pomerium or similar OAuth proxy to handle authentication externally
+2. **Built-in OAuth Server** - Implement OAuth directly in the MCP server using the provided modular implementation
+
+The OAuth implementation is designed to be easily added or removed without affecting core server functionality.
+
+### Enabling OAuth
+
+To enable OAuth authentication, see the `src/auth/` directory for a modular OAuth implementation that can be toggled via environment variables.
 
 ## Why Express?
 
