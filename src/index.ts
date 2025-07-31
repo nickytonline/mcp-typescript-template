@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createTextResult } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
+import { createAuthMiddleware } from "./auth/index.ts";
 
 const getServer = () => {
   const config = getConfig();
@@ -35,6 +36,11 @@ const getServer = () => {
 
 const app = express();
 app.use(express.json());
+
+// Apply OAuth middleware conditionally
+const config = getConfig();
+const authMiddleware = config.ENABLE_AUTH ? createAuthMiddleware() : undefined;
+app.use("/mcp", authMiddleware);
 
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 

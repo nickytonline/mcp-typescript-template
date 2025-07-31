@@ -32,9 +32,11 @@ This is a TypeScript template for building Model Context Protocol (MCP) servers.
   - Defines all available MCP tools with their JSON schemas
   - Routes tool calls to registered tool handlers
   - Handles error responses in MCP format
+  - Conditionally applies OAuth middleware based on configuration
 - **`src/config.ts`** - Environment configuration with validation using Zod
 - **`src/logger.ts`** - Structured logging with Pino (OpenTelemetry compatible)
 - **`src/lib/utils.ts`** - Utility functions for MCP response formatting
+- **`src/auth/`** - Optional OAuth 2.1 authentication module (can be completely removed)
 
 ### Template MCP Tools Available
 
@@ -89,6 +91,16 @@ The following environment variables are supported (see `src/config.ts`):
 - `SERVER_VERSION` - Server version (default: 1.0.0)
 - `LOG_LEVEL` - Logging level (error/warn/info/debug, default: info)
 
+### OAuth Configuration (Optional)
+
+- `ENABLE_AUTH` - Enable OAuth authentication (default: false)
+- `OAUTH_CLIENT_ID` - OAuth client ID (required if auth enabled)
+- `OAUTH_CLIENT_SECRET` - OAuth client secret (required if auth enabled)
+- `OAUTH_AUTH_ENDPOINT` - OAuth authorization endpoint (required if auth enabled)
+- `OAUTH_TOKEN_ENDPOINT` - OAuth token endpoint (required if auth enabled)
+- `OAUTH_SCOPE` - OAuth scope (default: "read")
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI (required if auth enabled)
+
 ## Logging Best Practices
 
 - Use appropriate log levels: `error`, `warn`, `info`, `debug`
@@ -109,3 +121,29 @@ When adding new tools to the MCP server:
 5. Handle errors gracefully and return appropriate error messages
 6. Use structured logging to track tool usage: `logger.info("Tool executed", { toolName, args })`
 7. Log errors with context: `logger.error("Tool execution failed", { toolName, error: error.message })`
+
+## OAuth Implementation
+
+### Modular Authentication
+
+The template includes optional OAuth 2.1 authentication that can be easily enabled or completely removed:
+
+- **Modular Design**: All OAuth code is in `src/auth/` directory
+- **Conditional Loading**: OAuth middleware only applies when `ENABLE_AUTH=true`
+- **Zero Impact When Disabled**: No performance overhead when authentication is disabled
+- **Easy Removal**: Delete `src/auth/` directory and remove auth import from `src/index.ts`
+
+### Authentication Patterns
+
+1. **External OAuth (Recommended)**: Use Pomerium or similar OAuth proxy
+2. **Built-in OAuth Server**: Use the provided OAuth implementation in `src/auth/`
+
+### Removing OAuth
+
+To completely remove OAuth support:
+
+1. Delete the `src/auth/` directory
+2. Remove the auth import and middleware lines from `src/index.ts`  
+3. Remove OAuth environment variables from `src/config.ts`
+
+The core MCP server functionality is completely independent of the authentication layer.
