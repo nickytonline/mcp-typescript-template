@@ -1,5 +1,5 @@
+import * as jose from "jose";
 import { logger } from "../logger.ts";
-import { jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 
 export interface TokenValidationResult {
   valid: boolean;
@@ -8,17 +8,15 @@ export interface TokenValidationResult {
 }
 
 /**
- * Gateway token validator - validates JWT tokens from external OAuth providers
+ * OAuth token validator - validates JWT tokens from external OAuth providers
  */
-export class GatewayTokenValidator {
+export class OAuthTokenValidator {
   #issuer: string;
   #audience?: string;
-  #jwks: ReturnType<typeof createRemoteJWKSet>;
 
   constructor(issuer: string, audience?: string) {
     this.#issuer = issuer;
     this.#audience = audience;
-    this.#jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
   }
 
   async validateToken(token: string): Promise<TokenValidationResult> {
@@ -41,10 +39,20 @@ export class GatewayTokenValidator {
 
   private async validateJWT(token: string): Promise<TokenValidationResult> {
     try {
-      const { payload } = await jwtVerify(token, this.#jwks, {
+      // Get JWKS from the issuer
+      const JWKS = jose.createRemoteJWKSet(new URL(`${this.#issuer}/.well-known/jwks.json`));
+      
+      // Verify and decode the JWT
+      const verifyOptions: any = {
         issuer: this.#issuer,
-        audience: this.#audience,
-      });
+      };
+      
+      // Only validate audience if provided
+      if (this.#audience) {
+        verifyOptions.audience = this.#audience;
+      }
+      
+      const { payload } = await jose.jwtVerify(token, JWKS, verifyOptions);
 
       return {
         valid: true,
@@ -52,7 +60,17 @@ export class GatewayTokenValidator {
       };
 
     } catch (error) {
-      logger.warn("JWT verification failed, falling back to introspection", { 
+      if (error instanceof jose.errors.JWTExpired) {
+        return { valid: false, error: "Token expired" };
+      }
+      if (error instanceof jose.errors.JWTInvalid) {
+        return { valid: false, error: "Invalid token" };
+      }
+      if (error instanceof jose.errors.JWKSNoMatchingKey) {
+        return { valid: false, error: "No matching key found" };
+      }
+      
+      logger.warn("JWT validation failed, falling back to introspection", { 
         error: error instanceof Error ? error.message : error 
       });
       return await this.introspectToken(token);
@@ -99,44 +117,38 @@ export class GatewayTokenValidator {
 }
 
 /**
- * Built-in token validator for OAuth authorization server mode using oauth2-server
+ * Built-in token validator for OAuth authorization server mode
  */
 export class BuiltinTokenValidator {
-  #oauthServer: any;
-
-  constructor(oauthServer: any) {
-    this.#oauthServer = oauthServer;
+  #tokens = new Map<string, { userId: string; expiresAt: Date }>();
+  storeToken(token: string, userId: string, expiresAt: Date): void {
+    this.#tokens.set(token, { userId, expiresAt });
+    
+    setTimeout(() => {
+      this.#tokens.delete(token);
+    }, expiresAt.getTime() - Date.now());
   }
 
   async validateToken(token: string): Promise<TokenValidationResult> {
     try {
-      // Create mock request with Authorization header
-      const mockRequest = {
-        method: 'GET',
-        url: '/',
-        headers: {
-          authorization: `Bearer ${token}`
-        }
-      };
-
-      const mockResponse = {
-        status: () => mockResponse,
-        json: () => mockResponse,
-        headers: {}
-      };
-
-      const request = new this.#oauthServer.server.Request(mockRequest);
-      const response = new this.#oauthServer.server.Response(mockResponse);
-
-      const authenticatedToken = await this.#oauthServer.server.authenticate(request, response);
+      const tokenData = this.#tokens.get(token);
       
+      if (!tokenData) {
+        return { valid: false, error: "Token not found" };
+      }
+
+      if (tokenData.expiresAt < new Date()) {
+        this.#tokens.delete(token);
+        return { valid: false, error: "Token expired" };
+      }
+
       return {
         valid: true,
-        userId: authenticatedToken.user.id,
+        userId: tokenData.userId,
       };
 
     } catch (error) {
-      logger.warn("Built-in token validation failed", { 
+      logger.error("Built-in token validation error", { 
         error: error instanceof Error ? error.message : error 
       });
       return { valid: false, error: "Token validation failed" };

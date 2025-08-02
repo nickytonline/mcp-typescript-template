@@ -9,29 +9,13 @@ const configSchema = z.object({
   SERVER_VERSION: z.string().default("1.0.0"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
-  // Authentication Configuration (optional)
-  ENABLE_AUTH: z.preprocess((val) => {
-    // Handle string-to-boolean conversion properly
-    if (typeof val === "string") {
-      return val.toLowerCase() === "true";
-    }
-    return val;
-  }, z.boolean().default(false)),
-  
-  // Auth mode: "gateway" (resource server) or "builtin" (authorization server)
-  AUTH_MODE: z.enum(["gateway", "builtin"]).default("gateway"),
-  
-  // Gateway mode: External OAuth provider token validation
-  OAUTH_ISSUER: z.string().optional(), // OAuth issuer URL for token validation
-  OAUTH_AUDIENCE: z.string().optional(), // Expected audience in JWT tokens
-  
-  // Built-in mode: OAuth server configuration (for testing/demos)
+  BASE_URL: z.string().optional(),
+  AUTH_MODE: z.enum(["none", "full", "resource_server"]).default("none"),
+
+  OAUTH_ISSUER: z.string().optional(),
+  OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
-  OAUTH_AUTH_ENDPOINT: z.string().optional(),
-  OAUTH_TOKEN_ENDPOINT: z.string().optional(),
-  OAUTH_SCOPE: z.string().default("read"),
-  OAUTH_REDIRECT_URI: z.string().optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -43,30 +27,42 @@ export function getConfig(): Config {
     try {
       const parsed = configSchema.parse(process.env);
 
-      // Only validate auth configuration if auth is explicitly enabled
-      if (parsed.ENABLE_AUTH === true) {
-        if (parsed.AUTH_MODE === "gateway") {
-          // Gateway mode: validate token validation config
-          if (!parsed.OAUTH_ISSUER) {
-            throw new Error(
-              "Gateway auth mode requires OAUTH_ISSUER for token validation. " +
-              "Set OAUTH_ISSUER to your OAuth provider's issuer URL (e.g., https://your-domain.auth0.com)"
-            );
-          }
-        } else if (parsed.AUTH_MODE === "builtin") {
-          // Built-in mode: validate OAuth server config
-          const missingVars = [];
-          if (!parsed.OAUTH_CLIENT_ID) missingVars.push("OAUTH_CLIENT_ID");
-          if (!parsed.OAUTH_CLIENT_SECRET) missingVars.push("OAUTH_CLIENT_SECRET");
-          if (!parsed.OAUTH_AUTH_ENDPOINT) missingVars.push("OAUTH_AUTH_ENDPOINT");
-          if (!parsed.OAUTH_TOKEN_ENDPOINT) missingVars.push("OAUTH_TOKEN_ENDPOINT");
-          if (!parsed.OAUTH_REDIRECT_URI) missingVars.push("OAUTH_REDIRECT_URI");
-          
-          if (missingVars.length > 0) {
-            throw new Error(
-              `Built-in auth mode requires OAuth configuration. Missing: ${missingVars.join(", ")}`
-            );
-          }
+      if (parsed.AUTH_MODE === "full") {
+        const missingVars = [];
+        if (!parsed.OAUTH_ISSUER) missingVars.push("OAUTH_ISSUER");
+        if (!parsed.OAUTH_CLIENT_ID) missingVars.push("OAUTH_CLIENT_ID");
+        if (!parsed.OAUTH_CLIENT_SECRET)
+          missingVars.push("OAUTH_CLIENT_SECRET");
+
+        if (missingVars.length > 0) {
+          throw new Error(
+            `AUTH_MODE=full requires complete OAuth configuration. Missing: ${missingVars.join(", ")}\n` +
+              "Set these in your .env file:\n" +
+              "OAUTH_ISSUER=https://your-issuer.com\n" +
+              "OAUTH_CLIENT_ID=your-some-idp-client-id\n" +
+              "OAUTH_CLIENT_SECRET=your-some-idp-client-secret",
+          );
+        }
+      }
+
+      if (
+        parsed.AUTH_MODE === "resource_server" ||
+        parsed.AUTH_MODE === "full"
+      ) {
+        if (!parsed.OAUTH_ISSUER) {
+          throw new Error(
+            `AUTH_MODE=${parsed.AUTH_MODE} requires OAUTH_ISSUER for JWT token validation.\n` +
+              "Set OAUTH_ISSUER=https://your-issuer.com",
+          );
+        }
+
+        if (!parsed.OAUTH_AUDIENCE) {
+          console.warn(
+            "⚠️  OAUTH_AUDIENCE not set. Tokens will not be validated for intended audience.\n" +
+              "   For production deployments, consider implementing the resource server pattern:\n" +
+              "   https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization#authorization-server-discovery\n" +
+              "   Set OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
+          );
         }
       }
 
