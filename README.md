@@ -142,8 +142,19 @@ docker-compose up --build
 ```
 mcp-typescript-template/
 ├── src/
+│   ├── auth/             # Optional OAuth authentication module
+│   │   ├── index.ts      # Auth initialization and middleware factory
+│   │   ├── middleware.ts # Authentication middleware
+│   │   ├── oauth-provider.ts # OAuth client implementation
+│   │   ├── routes.ts     # OAuth routes (/authorize, /callback)
+│   │   └── token-validator.ts # Token validation (gateway/builtin)
+│   ├── lib/
+│   │   └── utils.ts      # MCP utility functions
+│   ├── config.ts         # Environment configuration with validation
+│   ├── logger.ts         # Structured logging with Pino
 │   └── index.ts          # Main MCP server entry point
 ├── dist/                 # Built output (generated)
+├── .env.example          # Environment variables template
 ├── .eslintrc.js         # ESLint configuration
 ├── .prettierrc          # Prettier configuration
 ├── tsconfig.json        # TypeScript configuration
@@ -187,18 +198,150 @@ server.registerTool(
 
 ## Authentication & Authorization
 
-### OAuth 2.1 Support
+This template provides **optional** OAuth 2.1 authentication with two deployment patterns:
 
-This template supports **optional** OAuth 2.1 authentication with two approaches:
+### 🔧 Authentication Modes
 
-1. **External OAuth (Recommended)** - Use Pomerium or similar OAuth proxy to handle authentication externally
-2. **Built-in OAuth Server** - Implement OAuth directly in the MCP server using the provided modular implementation
+#### Gateway Mode (Enterprise/Multi-Service)
+- **Resource Server Pattern**: MCP server only validates tokens from external OAuth providers
+- **External OAuth**: Authentication handled by reverse proxy/gateway (Pomerium, nginx, API Gateway)
+- **JWT + Introspection**: Supports both JWT validation and token introspection
+- **Stateless**: No OAuth routes, sessions, or cookies in MCP server
+- **Scalable**: Easy to horizontally scale the MCP server
+- **Best for**: Organizations with existing OAuth infrastructure
 
-The OAuth implementation is designed to be easily added or removed without affecting core server functionality.
+#### Built-in Mode (Standalone/Simple Deployment)
+- **OAuth 2.1 Authorization Server**: MCP server IS the complete OAuth authorization server
+- **PKCE Support**: Full PKCE implementation as required by MCP specification
+- **MCP Client Compatible**: Works seamlessly with VS Code and other MCP clients
+- **Self-contained**: No external OAuth provider needed
+- **Discovery Endpoints**: Provides OAuth 2.1 discovery metadata for automatic client configuration
+- **Best for**: Solo developers, small teams, or simple deployments wanting OAuth security
 
-### Enabling OAuth
+#### No Auth Mode (Default)
+- **Completely Optional**: Authentication can be disabled entirely
+- **Simple Setup**: Just set `ENABLE_AUTH=false` or omit auth configuration
+- **Open Access**: MCP server accepts all requests without authentication
 
-To enable OAuth authentication, see the `src/auth/` directory for a modular OAuth implementation that can be toggled via environment variables.
+### 🚀 Quick Setup
+
+#### 1. Gateway Mode (Enterprise)
+```bash
+# .env
+ENABLE_AUTH=true
+AUTH_MODE=gateway
+OAUTH_ISSUER=https://your-domain.auth0.com
+OAUTH_AUDIENCE=your-api-identifier  # optional
+```
+
+**Setup your gateway (e.g., Pomerium):**
+```yaml
+# pomerium-config.yaml
+routes:
+  - from: https://mcp.yourdomain.com
+    to: http://localhost:3000
+    policies:
+      - allow:
+          and:
+            - authenticated_user: true
+```
+
+#### 2. Built-in Mode (Standalone)
+```bash
+# .env
+ENABLE_AUTH=true
+AUTH_MODE=builtin
+# No external OAuth configuration needed - server acts as OAuth provider
+```
+
+**OAuth 2.1 Endpoints (automatically available):**
+- `GET /.well-known/oauth-authorization-server` - OAuth server metadata
+- `GET /.well-known/oauth-protected-resource` - Resource server metadata  
+- `GET /authorize` - OAuth authorization endpoint (with PKCE)
+- `POST /token` - Token exchange endpoint
+- `POST /introspect` - Token introspection endpoint
+- `POST /revoke` - Token revocation endpoint
+
+#### 3. No Auth Mode (Default)
+```bash
+# .env (or just omit ENABLE_AUTH)
+ENABLE_AUTH=false
+```
+Server accepts all requests without authentication.
+
+### 🔐 Token Validation
+
+Both modes validate tokens using the **resource server pattern**:
+
+```bash
+# Make authenticated requests
+curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  http://localhost:3000/mcp
+```
+
+### 🏗️ Architecture
+
+```
+┌─────── Gateway Mode (Enterprise) ───────┐  ┌────── Built-in Mode (Standalone) ───┐  ┌── No Auth (Default) ──┐
+│                                         │  │                                     │  │                       │
+│  MCP Client → Gateway → MCP Server      │  │  MCP Client → MCP Server           │  │  MCP Client           │
+│              ↓                          │  │              ↓                     │  │      ↓               │
+│       External OAuth (Auth0)            │  │       Built-in OAuth Server       │  │  MCP Server           │
+│                                         │  │                                     │  │   (Open Access)      │
+│  ✅ Enterprise ready                     │  │  ✅ Production ready                │  │  ✅ Simple setup      │
+│  ✅ Stateless & scalable                │  │  ✅ OAuth 2.1 compliant            │  │  ✅ No auth overhead  │
+│  ✅ Security best practices             │  │  ✅ PKCE + Discovery               │  │  ✅ Perfect for dev   │
+│  ✅ JWT + Token introspection           │  │  ✅ Works with VS Code             │  │                       │
+└─────────────────────────────────────────┘  └─────────────────────────────────────┘  └───────────────────────┘
+```
+
+### 🔧 Provider Examples
+
+<details>
+<summary><strong>Auth0 Configuration</strong></summary>
+
+**Gateway Mode:**
+```bash
+OAUTH_ISSUER=https://your-domain.auth0.com
+OAUTH_AUDIENCE=your-api-identifier
+```
+
+**Built-in Mode:**
+```bash
+OAUTH_AUTH_ENDPOINT=https://your-domain.auth0.com/authorize
+OAUTH_TOKEN_ENDPOINT=https://your-domain.auth0.com/oauth/token
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+```
+</details>
+
+<details>
+<summary><strong>Google OAuth Configuration</strong></summary>
+
+**Gateway Mode:**
+```bash
+OAUTH_ISSUER=https://accounts.google.com
+OAUTH_AUDIENCE=your-client-id.apps.googleusercontent.com
+```
+
+**Built-in Mode:**
+```bash
+OAUTH_AUTH_ENDPOINT=https://accounts.google.com/o/oauth2/v2/auth
+OAUTH_TOKEN_ENDPOINT=https://oauth2.googleapis.com/token
+OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
+OAUTH_CLIENT_SECRET=your-client-secret
+```
+</details>
+
+### 🛠️ Customization
+
+The auth implementation is modular and can be easily:
+- Disabled completely (set `ENABLE_AUTH=false`)
+- Removed entirely (delete `src/auth/` directory)
+- Extended with custom validation logic
+- Integrated with other OAuth providers
+
+See `src/auth/` for implementation details.
 
 ## Why Express?
 
