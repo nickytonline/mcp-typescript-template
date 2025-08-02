@@ -7,7 +7,15 @@ import { z } from "zod";
 import { createTextResult } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
-import { createAuthMiddleware } from "./auth/index.ts";
+import { createAuthenticationMiddleware, initializeAuth } from "./auth/index.ts";
+import { createAuthorizeHandler, createCallbackHandler } from "./auth/routes.ts";
+import { 
+  createAuthorizationServerMetadataHandler, 
+  createProtectedResourceMetadataHandler,
+  createTokenHandler,
+  createIntrospectionHandler,
+  createRevocationHandler
+} from "./auth/discovery.ts";
 
 const getServer = () => {
   const config = getConfig();
@@ -36,11 +44,6 @@ const getServer = () => {
 
 const app = express();
 app.use(express.json());
-
-// Apply OAuth middleware conditionally
-const config = getConfig();
-const authMiddleware = config.ENABLE_AUTH ? createAuthMiddleware() : undefined;
-app.use("/mcp", authMiddleware);
 
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
@@ -109,9 +112,31 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
   }
 };
 
-// Handle MCP requests on /mcp endpoint
-app.post("/mcp", mcpHandler);
-app.get("/mcp", mcpHandler);
+// Setup OAuth routes and discovery endpoints
+const config = getConfig();
+if (config.ENABLE_AUTH && config.AUTH_MODE === "builtin") {
+  const { oauthProvider } = initializeAuth();
+  if (oauthProvider) {
+    // OAuth 2.1 Discovery endpoints (required by MCP spec)
+    app.get("/.well-known/oauth-authorization-server", createAuthorizationServerMetadataHandler());
+    app.get("/.well-known/oauth-protected-resource", createProtectedResourceMetadataHandler());
+    
+    // OAuth 2.1 endpoints
+    app.get("/authorize", createAuthorizeHandler(oauthProvider));
+    app.get("/callback", createCallbackHandler(oauthProvider));
+    app.post("/token", createTokenHandler(oauthProvider));
+    app.post("/introspect", createIntrospectionHandler());
+    app.post("/revoke", createRevocationHandler());
+    
+    logger.info("OAuth 2.1 endpoints registered for built-in auth mode", { 
+      discovery: ["/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"],
+      endpoints: ["/authorize", "/callback", "/token", "/introspect", "/revoke"]
+    });
+  }
+}
+
+app.use("/mcp", createAuthenticationMiddleware(), mcpHandler);
+app.post("/mcp", createAuthenticationMiddleware(), mcpHandler);
 
 async function main() {
   const config = getConfig();
