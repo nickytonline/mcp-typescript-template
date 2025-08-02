@@ -55,13 +55,21 @@ export function getConfig(): Config {
               "Set OAUTH_ISSUER=https://your-issuer.com",
           );
         }
+      }
 
+      // OAuth audience validation: required for resource_server, optional but recommended for full
+      if (parsed.AUTH_MODE === "resource_server") {
+        if (!parsed.OAUTH_AUDIENCE) {
+          throw new Error(
+            "AUTH_MODE=resource_server requires OAUTH_AUDIENCE for token validation.\n" +
+              "Set OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
+          );
+        }
+      } else if (parsed.AUTH_MODE === "full") {
         if (!parsed.OAUTH_AUDIENCE) {
           console.warn(
-            "⚠️  OAUTH_AUDIENCE not set. Tokens will not be validated for intended audience.\n" +
-              "   For production deployments, consider implementing the resource server pattern:\n" +
-              "   https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization#authorization-server-discovery\n" +
-              "   Set OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
+            "⚠️  OAUTH_AUDIENCE not set for full mode. Tokens will not be validated for intended audience.\n" +
+              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
           );
         }
       }

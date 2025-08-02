@@ -115,6 +115,26 @@ describe("config", () => {
         expect(config.OAUTH_CLIENT_SECRET).toBe("client-secret");
       });
 
+      it("should warn when OAUTH_AUDIENCE is missing for full mode", async () => {
+        process.env.AUTH_MODE = "full";
+        process.env.OAUTH_ISSUER = "https://issuer.example.com";
+        process.env.OAUTH_CLIENT_ID = "client-id";
+        process.env.OAUTH_CLIENT_SECRET = "client-secret";
+        // Missing OAUTH_AUDIENCE
+
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const { getConfig } = await import("./config.ts");
+        const config = getConfig();
+
+        expect(config.AUTH_MODE).toBe("full");
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("⚠️  OAUTH_AUDIENCE not set for full mode")
+        );
+
+        warnSpy.mockRestore();
+      });
+
       it("should require OAUTH_ISSUER for resource_server mode", async () => {
         process.env.AUTH_MODE = "resource_server";
         // Missing OAUTH_ISSUER
@@ -131,22 +151,21 @@ describe("config", () => {
         exitSpy.mockRestore();
       });
 
-      it("should warn when OAUTH_AUDIENCE is missing for resource_server mode", async () => {
+      it("should error when OAUTH_AUDIENCE is missing for resource_server mode", async () => {
         process.env.AUTH_MODE = "resource_server";
         process.env.OAUTH_ISSUER = "https://issuer.example.com";
         // Missing OAUTH_AUDIENCE
 
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+        const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+          throw new Error("process.exit called");
+        });
 
         const { getConfig } = await import("./config.ts");
-        const config = getConfig();
+        expect(() => getConfig()).toThrow("process.exit called");
 
-        expect(config.AUTH_MODE).toBe("resource_server");
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining("⚠️  OAUTH_AUDIENCE not set")
-        );
-
-        warnSpy.mockRestore();
+        consoleSpy.mockRestore();
+        exitSpy.mockRestore();
       });
 
       it("should accept resource_server mode with complete configuration", async () => {
