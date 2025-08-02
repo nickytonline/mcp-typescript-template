@@ -112,25 +112,25 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
   }
 };
 
-// Setup OAuth routes and discovery endpoints
+// Setup OAuth routes and discovery endpoints for full mode
 const config = getConfig();
-if (config.ENABLE_AUTH && config.AUTH_MODE === "builtin") {
-  const { oauthServer } = initializeAuth();
-  if (oauthServer) {
+if (config.AUTH_MODE === "full") {
+  const { oauthProvider } = initializeAuth();
+  if (oauthProvider) {
     // OAuth 2.1 Discovery endpoints (required by MCP spec)
     app.get("/.well-known/oauth-authorization-server", createAuthorizationServerMetadataHandler());
     app.get("/.well-known/oauth-protected-resource", createProtectedResourceMetadataHandler());
     
-    // OAuth 2.1 endpoints using oauth2-server
-    app.get("/authorize", createAuthorizeHandler(oauthServer));
-    app.get("/callback", createCallbackHandler());
-    app.post("/token", createTokenHandler(oauthServer));
-    app.post("/introspect", createIntrospectionHandler(oauthServer));
-    app.post("/revoke", createRevocationHandler());
+    // OAuth 2.1 proxy endpoints - these proxy to the external OAuth provider
+    app.get("/oauth/authorize", createAuthorizeHandler(oauthProvider));
+    app.get("/oauth/callback", createCallbackHandler());
+    app.post("/oauth/token", createTokenHandler(oauthProvider));
+    app.post("/oauth/introspect", createIntrospectionHandler(oauthProvider));
+    app.post("/oauth/revoke", createRevocationHandler());
     
-    logger.info("OAuth 2.1 endpoints registered for built-in auth mode", { 
+    logger.info("OAuth 2.1 proxy endpoints registered for full auth mode", { 
       discovery: ["/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"],
-      endpoints: ["/authorize", "/callback", "/token", "/introspect", "/revoke"]
+      endpoints: ["/oauth/authorize", "/oauth/callback", "/oauth/token", "/oauth/introspect", "/oauth/revoke"]
     });
   }
 }
