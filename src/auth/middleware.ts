@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { GatewayTokenValidator, BuiltinTokenValidator } from "./token-validator.ts";
+import { OAuthTokenValidator, BuiltinTokenValidator } from "./token-validator.ts";
 import { logger } from "../logger.ts";
 
 export interface AuthenticatedRequest extends Request {
@@ -7,7 +7,7 @@ export interface AuthenticatedRequest extends Request {
   accessToken?: string;
 }
 
-type TokenValidator = GatewayTokenValidator | BuiltinTokenValidator;
+type TokenValidator = OAuthTokenValidator | BuiltinTokenValidator;
 
 /**
  * Create authentication middleware that supports both gateway and built-in modes
@@ -27,7 +27,7 @@ export function createAuthMiddleware(tokenValidator: TokenValidator) {
       });
     }
 
-    const token = authHeader.substring(7); // Remove "Bearer " prefix
+    const token = authHeader.substring(7);
 
     try {
       const validation = await tokenValidator.validateToken(token);
@@ -39,7 +39,6 @@ export function createAuthMiddleware(tokenValidator: TokenValidator) {
         });
       }
 
-      // Add user context to request
       req.userId = validation.userId;
       req.accessToken = token;
 

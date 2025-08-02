@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from "node:crypto";
 import { logger } from "../logger.ts";
-import { GatewayTokenValidator } from "./token-validator.ts";
+import { OAuthTokenValidator } from "./token-validator.ts";
 
 export interface OAuthConfig {
   clientId: string;
@@ -32,7 +32,7 @@ interface AuthorizationCodeData {
  */
 export class OAuthProvider {
   #config: OAuthConfig;
-  #tokenValidator: GatewayTokenValidator;
+  #tokenValidator: OAuthTokenValidator;
   
   // In-memory stores (use database in production)
   #authorizationCodes = new Map<string, AuthorizationCodeData>();
@@ -43,7 +43,7 @@ export class OAuthProvider {
     
     // For built-in mode, we ARE the issuer
     const issuer = "http://localhost:3000"; // This should be dynamic based on server config
-    this.#tokenValidator = new GatewayTokenValidator(issuer);
+    this.#tokenValidator = new OAuthTokenValidator(issuer);
     
     // Clean up expired codes and tokens periodically
     setInterval(() => this.cleanup(), 60 * 1000); // Every minute
