@@ -78,65 +78,57 @@ export function createProtectedResourceMetadataHandler() {
 }
 
 /**
- * OAuth 2.1 token endpoint with PKCE support
+ * OAuth 2.1 token endpoint with PKCE support using oauth2-server
  */
-export function createTokenHandler(oauthProvider: any) {
+export function createTokenHandler(oauthServer: any) {
   return async (req: Request, res: Response) => {
     try {
-      const { grant_type, code, redirect_uri, code_verifier, client_id } = req.body;
+      const request = new oauthServer.server.Request(req);
+      const response = new oauthServer.server.Response(res);
 
-      if (grant_type !== "authorization_code") {
-        return res.status(400).json({
-          error: "unsupported_grant_type",
-          error_description: "Only authorization_code grant type is supported"
-        });
-      }
-
-      if (!code || !redirect_uri || !code_verifier || !client_id) {
-        return res.status(400).json({
-          error: "invalid_request",
-          error_description: "Missing required parameters: code, redirect_uri, code_verifier, client_id"
-        });
-      }
-      const tokenResult = await oauthProvider.exchangeAuthorizationCode(
-        code, 
-        code_verifier, 
-        client_id, 
-        redirect_uri
-      );
-
-      if (!tokenResult) {
-        return res.status(400).json({
-          error: "invalid_grant",
-          error_description: "Invalid authorization code or PKCE verification failed"
-        });
-      }
-
-      logger.info("Token exchange successful", { client_id, scope: tokenResult.scope });
+      const token = await oauthServer.server.token(request, response);
+      
+      logger.info("Token exchange successful", { 
+        client_id: token.client.id,
+        scope: token.scope 
+      });
 
       res.json({
-        access_token: tokenResult.accessToken,
+        access_token: token.accessToken,
         token_type: "Bearer",
-        expires_in: tokenResult.expiresIn,
-        scope: tokenResult.scope
+        expires_in: Math.floor((token.accessTokenExpiresAt.getTime() - Date.now()) / 1000),
+        scope: token.scope
       });
 
     } catch (error) {
       logger.error("Token endpoint error", { 
         error: error instanceof Error ? error.message : error 
       });
-      res.status(500).json({
-        error: "server_error",
-        error_description: "Failed to process token request"
-      });
+      
+      if (error.name === 'InvalidGrantError') {
+        res.status(400).json({
+          error: "invalid_grant",
+          error_description: error.message
+        });
+      } else if (error.name === 'InvalidRequestError') {
+        res.status(400).json({
+          error: "invalid_request", 
+          error_description: error.message
+        });
+      } else {
+        res.status(500).json({
+          error: "server_error",
+          error_description: "Failed to process token request"
+        });
+      }
     }
   };
 }
 
 /**
- * Token introspection endpoint
+ * Token introspection endpoint using oauth2-server
  */
-export function createIntrospectionHandler() {
+export function createIntrospectionHandler(oauthServer?: any) {
   return async (req: Request, res: Response) => {
     try {
       const { token } = req.body;
@@ -148,16 +140,38 @@ export function createIntrospectionHandler() {
         });
       }
 
-      // TODO: Implement actual token introspection
-      // For now, return active=true for any token
-      logger.info("Token introspection requested", { token: token.substring(0, 10) + "..." });
+      if (oauthServer) {
+        try {
+          const accessToken = await oauthServer.server.model.getAccessToken(token);
+          
+          if (!accessToken || accessToken.accessTokenExpiresAt < new Date()) {
+            return res.json({ active: false });
+          }
 
-      res.json({
-        active: true,
-        scope: "read",
-        client_id: "mcp-client",
-        exp: Math.floor(Date.now() / 1000) + 3600
-      });
+          logger.info("Token introspection requested", { 
+            token: token.substring(0, 10) + "...",
+            client_id: accessToken.client.id 
+          });
+
+          res.json({
+            active: true,
+            scope: accessToken.scope,
+            client_id: accessToken.client.id,
+            exp: Math.floor(accessToken.accessTokenExpiresAt.getTime() / 1000)
+          });
+        } catch (error) {
+          res.json({ active: false });
+        }
+      } else {
+        // Fallback for gateway mode
+        logger.info("Token introspection requested", { token: token.substring(0, 10) + "..." });
+        res.json({
+          active: true,
+          scope: "read",
+          client_id: "mcp-client",
+          exp: Math.floor(Date.now() / 1000) + 3600
+        });
+      }
 
     } catch (error) {
       logger.error("Token introspection error", { 

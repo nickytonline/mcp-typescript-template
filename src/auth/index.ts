@@ -1,5 +1,5 @@
-import { OAuthProvider, type OAuthConfig } from "./oauth-provider.ts";
-import { GatewayTokenValidator } from "./token-validator.ts";
+import { ManagedOAuthServer } from "./oauth-server.ts";
+import { GatewayTokenValidator, BuiltinTokenValidator } from "./token-validator.ts";
 import { createAuthMiddleware } from "./middleware.ts";
 import { getConfig } from "../config.ts";
 import { logger } from "../logger.ts";
@@ -12,7 +12,7 @@ export function initializeAuth() {
 
   if (!config.ENABLE_AUTH) {
     logger.info("Authentication is disabled");
-    return { tokenValidator: null, oauthProvider: null };
+    return { tokenValidator: null, oauthServer: null };
   }
 
   if (config.AUTH_MODE === "gateway") {
@@ -21,22 +21,14 @@ export function initializeAuth() {
       config.OAUTH_ISSUER!,
       config.OAUTH_AUDIENCE
     );
-    return { tokenValidator, oauthProvider: null };
+    return { tokenValidator, oauthServer: null };
   }
 
   if (config.AUTH_MODE === "builtin") {
-    logger.info("Initializing built-in auth mode (OAuth client + resource server)");
-    const oauthConfig: OAuthConfig = {
-      clientId: config.OAUTH_CLIENT_ID!,
-      clientSecret: config.OAUTH_CLIENT_SECRET!,
-      authorizationEndpoint: config.OAUTH_AUTH_ENDPOINT!,
-      tokenEndpoint: config.OAUTH_TOKEN_ENDPOINT!,
-      scope: config.OAUTH_SCOPE || "read",
-      redirectUri: config.OAUTH_REDIRECT_URI!,
-    };
-
-    const oauthProvider = new OAuthProvider(oauthConfig);
-    return { tokenValidator: oauthProvider.tokenValidator, oauthProvider };
+    logger.info("Initializing built-in auth mode (OAuth authorization server)");
+    const oauthServer = new ManagedOAuthServer();
+    const tokenValidator = new BuiltinTokenValidator(oauthServer);
+    return { tokenValidator, oauthServer };
   }
 
   throw new Error(`Unknown auth mode: ${config.AUTH_MODE}`);

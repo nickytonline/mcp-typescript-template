@@ -1,86 +1,57 @@
 import type { Request, Response } from "express";
-import { randomBytes } from "node:crypto";
-import { OAuthProvider } from "./oauth-provider.ts";
 import { logger } from "../logger.ts";
 
 /**
- * OAuth authorization endpoint - generates authorization codes with PKCE
+ * OAuth authorization endpoint using oauth2-server
  */
-export function createAuthorizeHandler(oauthProvider: OAuthProvider) {
-  return (req: Request, res: Response) => {
+export function createAuthorizeHandler(oauthServer: any) {
+  return async (req: Request, res: Response) => {
     try {
-      const { 
-        response_type, 
-        client_id, 
-        redirect_uri, 
-        scope, 
-        state, 
-        code_challenge, 
-        code_challenge_method 
-      } = req.query;
-      
-      if (response_type !== "code") {
-        return res.status(400).json({
-          error: "unsupported_response_type",
-          error_description: "Only authorization code flow is supported"
-        });
-      }
+      const request = new oauthServer.server.Request(req);
+      const response = new oauthServer.server.Response(res);
 
-      if (!client_id || !redirect_uri) {
-        return res.status(400).json({
-          error: "invalid_request",
-          error_description: "Missing required parameters: client_id, redirect_uri"
-        });
-      }
-
-      if (!code_challenge || code_challenge_method !== "S256") {
-        return res.status(400).json({
-          error: "invalid_request",
-          error_description: "PKCE is required (code_challenge with S256 method)"
-        });
-      }
-      const authCode = randomBytes(32).toString("hex");
-      const oauthState = (state as string) || randomBytes(32).toString("hex");
-      oauthProvider.storeAuthorizationCode(authCode, {
-        clientId: client_id as string,
-        redirectUri: redirect_uri as string,
-        scope: scope as string || "read",
-        codeChallenge: code_challenge as string,
-        codeChallengeMethod: code_challenge_method as string,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000)
-      });
-      
-      const redirectUrl = new URL(redirect_uri as string);
-      redirectUrl.searchParams.set("code", authCode);
-      redirectUrl.searchParams.set("state", oauthState);
+      const code = await oauthServer.server.authorize(request, response);
       
       logger.info("Authorization code generated", { 
-        client_id, 
-        redirect_uri, 
-        code: authCode.substring(0, 8) + "..."
+        client_id: code.client.id,
+        redirect_uri: code.redirectUri,
+        code: code.authorizationCode.substring(0, 8) + "..."
       });
-      
-      res.redirect(redirectUrl.toString());
+
+      res.redirect(response.headers.location);
       
     } catch (error) {
       logger.error("OAuth authorization error", { 
         error: error instanceof Error ? error.message : error 
       });
-      res.status(500).json({
-        error: "server_error",
-        error_description: "Failed to process authorization request"
-      });
+      
+      if (error.name === 'InvalidClientError') {
+        res.status(400).json({
+          error: "invalid_client",
+          error_description: error.message
+        });
+      } else if (error.name === 'InvalidRequestError') {
+        res.status(400).json({
+          error: "invalid_request",
+          error_description: error.message
+        });
+      } else {
+        res.status(500).json({
+          error: "server_error",
+          error_description: "Failed to process authorization request"
+        });
+      }
     }
   };
 }
 
 /**
- * OAuth callback handler - completes OAuth flow
+ * OAuth callback handler - simplified for oauth2-server
  */
-export function createCallbackHandler(oauthProvider: OAuthProvider) {
+export function createCallbackHandler() {
   return async (req: Request, res: Response) => {
     try {
-      const { code, state, error, error_description } = req.query;
+      const { error, error_description } = req.query;
       
       if (error) {
         logger.warn("OAuth callback error from provider", { error, error_description });
@@ -90,22 +61,8 @@ export function createCallbackHandler(oauthProvider: OAuthProvider) {
         });
       }
       
-      // Validate required parameters
-      if (!code) {
-        logger.warn("Missing authorization code in callback");
-        return res.status(400).json({
-          error: "invalid_request",
-          error_description: "Missing authorization code"
-        });
-      }
+      logger.info("OAuth callback successful");
       
-      // Exchange authorization code for access token
-      const tokenResult = await oauthProvider.exchangeCodeForToken(code as string);
-      
-      logger.info("OAuth callback successful", { 
-        userId: tokenResult.userId,
-        state 
-      });
       const closeScript = `
         <!DOCTYPE html>
         <html>

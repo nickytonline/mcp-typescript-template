@@ -115,17 +115,17 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
 // Setup OAuth routes and discovery endpoints
 const config = getConfig();
 if (config.ENABLE_AUTH && config.AUTH_MODE === "builtin") {
-  const { oauthProvider } = initializeAuth();
-  if (oauthProvider) {
+  const { oauthServer } = initializeAuth();
+  if (oauthServer) {
     // OAuth 2.1 Discovery endpoints (required by MCP spec)
     app.get("/.well-known/oauth-authorization-server", createAuthorizationServerMetadataHandler());
     app.get("/.well-known/oauth-protected-resource", createProtectedResourceMetadataHandler());
     
-    // OAuth 2.1 endpoints
-    app.get("/authorize", createAuthorizeHandler(oauthProvider));
-    app.get("/callback", createCallbackHandler(oauthProvider));
-    app.post("/token", createTokenHandler(oauthProvider));
-    app.post("/introspect", createIntrospectionHandler());
+    // OAuth 2.1 endpoints using oauth2-server
+    app.get("/authorize", createAuthorizeHandler(oauthServer));
+    app.get("/callback", createCallbackHandler());
+    app.post("/token", createTokenHandler(oauthServer));
+    app.post("/introspect", createIntrospectionHandler(oauthServer));
     app.post("/revoke", createRevocationHandler());
     
     logger.info("OAuth 2.1 endpoints registered for built-in auth mode", { 
