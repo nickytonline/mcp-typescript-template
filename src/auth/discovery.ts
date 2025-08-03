@@ -160,12 +160,11 @@ export function createTokenHandler(oauthProvider: any) {
 }
 
 /**
- * Token introspection endpoint - proxies to external OAuth provider
+ * Token introspection endpoint - simplified for OAuth proxy pattern
  */
 export function createIntrospectionHandler(oauthProvider?: any) {
   return async (req: Request, res: Response) => {
     try {
-      const config = getConfig();
       const { token } = req.body;
 
       if (!token) {
@@ -175,54 +174,10 @@ export function createIntrospectionHandler(oauthProvider?: any) {
         });
       }
 
-      if (config.AUTH_MODE === "full") {
-        // Proxy introspection to external OAuth provider
-        try {
-          const introspectionParams = new URLSearchParams({
-            token,
-            token_type_hint: "access_token"
-          });
-
-          const introspectionResponse = await fetch(`${config.OAUTH_ISSUER}/oauth/introspect`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "Authorization": `Basic ${Buffer.from(`${config.OAUTH_CLIENT_ID}:${config.OAUTH_CLIENT_SECRET}`).toString('base64')}`
-            },
-            body: introspectionParams
-          });
-
-          if (!introspectionResponse.ok) {
-            logger.warn("External OAuth introspection failed", { 
-              status: introspectionResponse.status 
-            });
-            return res.json({ active: false });
-          }
-
-          const introspectionData = await introspectionResponse.json();
-          
-          logger.info("Token introspection proxied to external provider", { 
-            token: token.substring(0, 10) + "...",
-            active: introspectionData.active 
-          });
-
-          res.json(introspectionData);
-        } catch (error) {
-          logger.warn("External OAuth introspection error", { 
-            error: error instanceof Error ? error.message : error 
-          });
-          res.json({ active: false });
-        }
-      } else {
-        // Fallback - use our own token validator
-        logger.info("Token introspection requested", { token: token.substring(0, 10) + "..." });
-        res.json({
-          active: true,
-          scope: "read",
-          client_id: "mcp-client",
-          exp: Math.floor(Date.now() / 1000) + 3600
-        });
-      }
+      logger.info("Token introspection requested", { token: token.substring(0, 10) + "..." });
+      
+      // Return inactive for OAuth proxy pattern - external IdP handles actual validation
+      res.json({ active: false });
 
     } catch (error) {
       logger.error("Token introspection error", { 
