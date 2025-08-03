@@ -123,7 +123,7 @@ if (config.AUTH_MODE === "full") {
     
     // OAuth 2.1 proxy endpoints - these proxy to the external OAuth provider
     app.get("/oauth/authorize", createAuthorizeHandler(oauthProvider));
-    app.get("/oauth/callback", createCallbackHandler());
+    app.get(config.OAUTH_CALLBACK_PATH, createCallbackHandler());
     app.post("/oauth/token", createTokenHandler(oauthProvider));
     app.post("/oauth/introspect", createIntrospectionHandler(oauthProvider));
     app.post("/oauth/revoke", createRevocationHandler());

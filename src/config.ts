@@ -16,6 +16,7 @@ const configSchema = z.object({
   OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
+  OAUTH_CALLBACK_PATH: z.string().default("/callback"),
 });
 
 export type Config = z.infer<typeof configSchema>;
