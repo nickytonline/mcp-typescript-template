@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { OAuthTokenValidator, BuiltinTokenValidator } from "./token-validator.ts";
+import type { OAuthProvider } from "./oauth-provider.ts";
 import { logger } from "../logger.ts";
 
 export interface AuthenticatedRequest extends Request {
@@ -7,7 +8,7 @@ export interface AuthenticatedRequest extends Request {
   accessToken?: string;
 }
 
-type TokenValidator = OAuthTokenValidator | BuiltinTokenValidator;
+type TokenValidator = OAuthTokenValidator | BuiltinTokenValidator | OAuthProvider;
 
 /**
  * Create authentication middleware that supports both gateway and built-in modes
@@ -46,6 +47,56 @@ export function createAuthMiddleware(tokenValidator: TokenValidator) {
       next();
     } catch (error) {
       logger.error("Authentication middleware error", { 
+        error: error instanceof Error ? error.message : error 
+      });
+      return res.status(500).json({
+        error: "server_error",
+        error_description: "Internal server error during authentication",
+      });
+    }
+  };
+}
+
+/**
+ * Create authentication middleware specifically for OAuthProvider (full mode)
+ */
+export function createOAuthProviderAuthMiddleware(oauthProvider: OAuthProvider) {
+  return async (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "unauthorized",
+        error_description: "Missing or invalid authorization header",
+      });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+      const validation = await oauthProvider.validateToken(token);
+
+      if (!validation.valid) {
+        return res.status(401).json({
+          error: "invalid_token",
+          error_description: "The access token is invalid or expired",
+        });
+      }
+
+      req.userId = validation.userId;
+      req.accessToken = token;
+
+      logger.info("Request authenticated with OAuthProvider", { 
+        userId: validation.userId,
+        scope: validation.scope 
+      });
+      next();
+    } catch (error) {
+      logger.error("OAuthProvider authentication middleware error", { 
         error: error instanceof Error ? error.message : error 
       });
       return res.status(500).json({

@@ -24,6 +24,14 @@ interface AuthorizationCodeData {
   codeChallenge: string;
   codeChallengeMethod: string;
   expiresAt: Date;
+  externalTokens?: {
+    accessToken: string;
+    refreshToken?: string;
+    idToken?: string;
+    expiresAt: Date;
+    scope?: string;
+  };
+  userId?: string;
 }
 
 /**
@@ -36,7 +44,18 @@ export class OAuthProvider {
   
   // In-memory stores (use database in production)
   #authorizationCodes = new Map<string, AuthorizationCodeData>();
-  #accessTokens = new Map<string, { userId: string; scope: string; expiresAt: Date }>();
+  #accessTokens = new Map<string, { 
+    userId: string; 
+    scope: string; 
+    expiresAt: Date;
+    externalTokens?: {
+      accessToken: string;
+      refreshToken?: string;
+      idToken?: string;
+      expiresAt: Date;
+      scope?: string;
+    };
+  }>();
 
   constructor(config: OAuthConfig) {
     this.#config = config;
@@ -54,10 +73,45 @@ export class OAuthProvider {
   }
 
   /**
-   * Store authorization code with PKCE data
+   * Store authorization code with PKCE data and optional external token info
    */
   storeAuthorizationCode(code: string, data: AuthorizationCodeData): void {
     this.#authorizationCodes.set(code, data);
+    logger.info("Authorization code stored", {
+      code: code.substring(0, 8) + "...",
+      clientId: data.clientId,
+      hasExternalTokens: !!data.externalTokens
+    });
+  }
+
+  /**
+   * Store authorization code with external token data from IdP
+   */
+  storeAuthorizationCodeWithTokens(
+    code: string, 
+    data: Omit<AuthorizationCodeData, 'externalTokens'>, 
+    externalTokens: {
+      accessToken: string;
+      refreshToken?: string;
+      idToken?: string;
+      expiresIn: number;
+      scope?: string;
+    },
+    userId?: string
+  ): void {
+    const authCodeData: AuthorizationCodeData = {
+      ...data,
+      userId,
+      externalTokens: {
+        accessToken: externalTokens.accessToken,
+        refreshToken: externalTokens.refreshToken,
+        idToken: externalTokens.idToken,
+        expiresAt: new Date(Date.now() + externalTokens.expiresIn * 1000),
+        scope: externalTokens.scope
+      }
+    };
+    
+    this.storeAuthorizationCode(code, authCodeData);
   }
 
   /**
@@ -105,11 +159,13 @@ export class OAuthProvider {
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     const expiresIn = 3600;
 
-    // Store access token
+    // Store access token with user info from external tokens
+    const userId = codeData.userId || codeData.externalTokens?.accessToken.substring(0, 8) || "demo-user";
     this.#accessTokens.set(accessToken, {
-      userId: "demo-user", // In real implementation, this would be the authenticated user
+      userId,
       scope: codeData.scope,
-      expiresAt
+      expiresAt,
+      externalTokens: codeData.externalTokens
     });
 
     // Clean up authorization code (single use)
