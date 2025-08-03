@@ -12,11 +12,13 @@ const configSchema = z.object({
   BASE_URL: z.string().optional(),
   AUTH_MODE: z.enum(["none", "full", "resource_server"]).default("none"),
 
+  // OAuth configuration for external IdP integration
   OAUTH_ISSUER: z.string().optional(),
-  OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
-  OAUTH_CALLBACK_PATH: z.string().default("/callback"),
+  OAUTH_AUDIENCE: z.string().optional(),
+  OAUTH_REDIRECT_URI: z.string().optional(),
+  OAUTH_SCOPE: z.string().default("openid profile email"),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -28,49 +30,53 @@ export function getConfig(): Config {
     try {
       const parsed = configSchema.parse(process.env);
 
+      // Full mode validation - OAuth Authorization Server with external IdP
       if (parsed.AUTH_MODE === "full") {
-        const missingVars = [];
-        if (!parsed.OAUTH_ISSUER) missingVars.push("OAUTH_ISSUER");
-        if (!parsed.OAUTH_CLIENT_ID) missingVars.push("OAUTH_CLIENT_ID");
-        if (!parsed.OAUTH_CLIENT_SECRET)
-          missingVars.push("OAUTH_CLIENT_SECRET");
+        const requiredVars = [];
+        if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
+        if (!parsed.OAUTH_CLIENT_ID) requiredVars.push("OAUTH_CLIENT_ID");
+        if (!parsed.OAUTH_CLIENT_SECRET) requiredVars.push("OAUTH_CLIENT_SECRET");
 
-        if (missingVars.length > 0) {
+        // Provide default for OAUTH_REDIRECT_URI if not set
+        if (!parsed.OAUTH_REDIRECT_URI) {
+          const baseUrl = parsed.BASE_URL || "http://localhost:3000";
+          parsed.OAUTH_REDIRECT_URI = `${baseUrl}/callback`;
+          console.log(`⚠️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`);
+        }
+
+        if (requiredVars.length > 0) {
           throw new Error(
-            `AUTH_MODE=full requires complete OAuth configuration. Missing: ${missingVars.join(", ")}\n` +
-              "Set these in your .env file:\n" +
-              "OAUTH_ISSUER=https://your-issuer.com\n" +
-              "OAUTH_CLIENT_ID=your-some-idp-client-id\n" +
-              "OAUTH_CLIENT_SECRET=your-some-idp-client-secret",
+            `AUTH_MODE=full requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
+              "Example configuration:\n" +
+              "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
+              "OAUTH_CLIENT_ID=your-client-id\n" +
+              "OAUTH_CLIENT_SECRET=your-client-secret\n" +
+              "OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback\n" +
+              "OAUTH_AUDIENCE=your-api-identifier  # Optional but recommended"
           );
         }
-      }
 
-      if (
-        parsed.AUTH_MODE === "resource_server" ||
-        parsed.AUTH_MODE === "full"
-      ) {
-        if (!parsed.OAUTH_ISSUER) {
-          throw new Error(
-            `AUTH_MODE=${parsed.AUTH_MODE} requires OAUTH_ISSUER for JWT token validation.\n` +
-              "Set OAUTH_ISSUER=https://your-issuer.com",
-          );
-        }
-      }
-
-      // OAuth audience validation: required for resource_server, optional but recommended for full
-      if (parsed.AUTH_MODE === "resource_server") {
-        if (!parsed.OAUTH_AUDIENCE) {
-          throw new Error(
-            "AUTH_MODE=resource_server requires OAUTH_AUDIENCE for token validation.\n" +
-              "Set OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
-          );
-        }
-      } else if (parsed.AUTH_MODE === "full") {
+        // OAUTH_AUDIENCE is optional but recommended for full mode
         if (!parsed.OAUTH_AUDIENCE) {
           console.warn(
-            "⚠️  OAUTH_AUDIENCE not set for full mode. Tokens will not be validated for intended audience.\n" +
-              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier (e.g., 'mcp-server')",
+            "⚠️  OAUTH_AUDIENCE not set for full mode. Token validation will not check audience.\n" +
+              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier"
+          );
+        }
+      }
+
+      // Resource server mode validation
+      if (parsed.AUTH_MODE === "resource_server") {
+        const requiredVars = [];
+        if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
+        if (!parsed.OAUTH_AUDIENCE) requiredVars.push("OAUTH_AUDIENCE");
+
+        if (requiredVars.length > 0) {
+          throw new Error(
+            `AUTH_MODE=resource_server requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
+              "Example configuration:\n" +
+              "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
+              "OAUTH_AUDIENCE=your-api-identifier"
           );
         }
       }
