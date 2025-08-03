@@ -40,7 +40,7 @@ export class OAuthTokenValidator {
   private async validateJWT(token: string): Promise<TokenValidationResult> {
     try {
       // Get JWKS from the issuer
-      const JWKS = jose.createRemoteJWKSet(new URL(`${this.#issuer}/.well-known/jwks.json`));
+      const JWKS = jose.createRemoteJWKSet(new URL("/.well-known/jwks.json", this.#issuer));
       
       // Verify and decode the JWT
       const verifyOptions: any = {
@@ -78,9 +78,9 @@ export class OAuthTokenValidator {
   }
 
   private async introspectToken(token: string): Promise<TokenValidationResult> {
-    const introspectionUrl = `${this.#issuer}/oauth/introspect`;
+    const introspectionUrl = new URL("/oauth/introspect", this.#issuer);
     
-    const response = await fetch(introspectionUrl, {
+    const response = await fetch(introspectionUrl.toString(), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
