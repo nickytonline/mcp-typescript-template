@@ -40,7 +40,8 @@ export function getConfig(): Config {
         // Provide default for OAUTH_REDIRECT_URI if not set
         if (!parsed.OAUTH_REDIRECT_URI) {
           const baseUrl = parsed.BASE_URL || "http://localhost:3000";
-          parsed.OAUTH_REDIRECT_URI = `${baseUrl}/callback`;
+          const callbackUrl = new URL("/callback", baseUrl);
+          parsed.OAUTH_REDIRECT_URI = callbackUrl.toString();
           console.log(`⚠️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`);
         }
 

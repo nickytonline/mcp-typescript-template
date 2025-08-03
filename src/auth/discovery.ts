@@ -17,8 +17,8 @@ export function createAuthorizationServerMetadataHandler() {
 
       const metadata = {
         issuer: baseUrl,
-        authorization_endpoint: `${baseUrl}/oauth/authorize`,
-        token_endpoint: `${baseUrl}/oauth/token`,
+        authorization_endpoint: new URL("/oauth/authorize", baseUrl).toString(),
+        token_endpoint: new URL("/oauth/token", baseUrl).toString(),
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
@@ -60,7 +60,7 @@ export function createProtectedResourceMetadataHandler() {
         authorization_servers: [baseUrl],
         scopes_supported: ["read", "write", "mcp"],
         bearer_methods_supported: ["header"],
-        resource_documentation: `${baseUrl}/docs`
+        resource_documentation: new URL("/docs", baseUrl).toString()
       };
 
       logger.info("OAuth protected resource metadata requested", { 

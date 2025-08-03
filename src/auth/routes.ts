@@ -36,6 +36,11 @@ const pendingRequests = new Map<string, PendingAuthRequest>();
 export function createAuthorizeHandler() {
   return async (req: Request, res: Response) => {
     try {
+      logger.debug("Authorization handler called", { 
+        query: req.query,
+        url: req.url 
+      });
+      
       const config = getConfig();
       const { 
         response_type, 
@@ -94,28 +99,25 @@ export function createAuthorizeHandler() {
       });
 
       // Build authorization URL for external provider with our own PKCE
-      const authParams = new URLSearchParams({
-        response_type: "code",
-        client_id: config.OAUTH_CLIENT_ID!,
-        redirect_uri: config.OAUTH_REDIRECT_URI!,
-        scope: scope as string || "openid profile email",
-        state: requestId, // Use our request ID as state
-        code_challenge: externalCodeChallenge, // Use our generated challenge
-        code_challenge_method: "S256"
-      });
-
-      const authUrl = `${config.OAUTH_ISSUER}/oauth/authorize?${authParams}`;
+      const authUrl = new URL("/oauth/authorize", config.OAUTH_ISSUER!);
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("client_id", config.OAUTH_CLIENT_ID!);
+      authUrl.searchParams.set("redirect_uri", config.OAUTH_REDIRECT_URI!);
+      authUrl.searchParams.set("scope", scope as string || "openid profile email");
+      authUrl.searchParams.set("state", requestId);
+      authUrl.searchParams.set("code_challenge", externalCodeChallenge);
+      authUrl.searchParams.set("code_challenge_method", "S256");
       
       logger.info("Proxying OAuth authorization request", { 
         client_id,
         redirect_uri,
         scope,
         requestId,
-        external_auth_url: `${config.OAUTH_ISSUER}/oauth/authorize`
+        external_auth_url: new URL("/oauth/authorize", config.OAUTH_ISSUER!).toString()
       });
 
       // Redirect to external OAuth provider
-      res.redirect(authUrl);
+      res.redirect(authUrl.toString());
       
     } catch (error) {
       logger.error("OAuth authorization proxy error", { 
@@ -279,7 +281,7 @@ export function createCallbackHandler(oauthProvider: OAuthProvider) {
  */
 async function exchangeCodeForTokens(code: string, config: any, codeVerifier: string): Promise<TokenExchangeResponse | null> {
   try {
-    const tokenEndpoint = `${config.OAUTH_ISSUER}/oauth/token`;
+    const tokenEndpoint = new URL("/oauth/token", config.OAUTH_ISSUER!);
     
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
@@ -291,11 +293,11 @@ async function exchangeCodeForTokens(code: string, config: any, codeVerifier: st
     });
 
     logger.info("Exchanging authorization code with external provider", {
-      tokenEndpoint,
+      tokenEndpoint: tokenEndpoint.toString(),
       clientId: config.OAUTH_CLIENT_ID
     });
 
-    const response = await fetch(tokenEndpoint, {
+    const response = await fetch(tokenEndpoint.toString(), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -310,7 +312,7 @@ async function exchangeCodeForTokens(code: string, config: any, codeVerifier: st
         status: response.status,
         statusText: response.statusText,
         error: errorText,
-        tokenEndpoint,
+        tokenEndpoint: tokenEndpoint.toString(),
         clientId: config.OAUTH_CLIENT_ID
       });
       return null;
