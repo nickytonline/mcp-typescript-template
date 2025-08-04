@@ -9,7 +9,7 @@ type Client = OAuth2Server.Client;
 type Token = OAuth2Server.Token;
 type User = OAuth2Server.User;
 
-// In-memory storage for demo purposes
+// In-memory storage (use persistent storage in production)
 // In production, use a proper database
 const clients = new Map<string, Client>();
 const users = new Map<string, User>();
@@ -18,7 +18,7 @@ const tokens = new Map<string, Token>();
 
 // Get client configuration from environment
 const config = getConfig();
-const demoClient: Client = {
+const configuredClient: Client = {
   id: config.OAUTH_CLIENT_ID,
   clientSecret: config.OAUTH_CLIENT_SECRET,
   redirectUris: ['http://localhost:3000/callback', 'vscode://ms-vscode.claude-dev'],
@@ -26,7 +26,7 @@ const demoClient: Client = {
 };
 
 // Initialize client data
-clients.set(demoClient.id, demoClient);
+clients.set(configuredClient.id, configuredClient);
 
 export const oauthModel: AuthorizationCodeModel = {
   /**
@@ -214,7 +214,7 @@ export const oauthModel: AuthorizationCodeModel = {
       scope 
     });
 
-    // For demo purposes, allow all requested scopes
+    // Simplified scope validation - implement proper scope checking
     // In production, implement proper scope validation
     const allowedScopes = ['read', 'write', 'mcp'];
     const validScopes = scope.filter(s => allowedScopes.includes(s));

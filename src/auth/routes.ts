@@ -236,7 +236,7 @@ export function createCallbackHandler(oauthProvider: OAuthProvider) {
           expiresIn: tokenResponse.expires_in,
           scope: tokenResponse.scope
         },
-        `external-user-${requestId.substring(0, 8)}` // Simple user ID for demo
+        `external-user-${randomBytes(8).toString('hex')}` // Generate unique user ID
       );
       
       logger.info("Token exchange completed, MCP auth code generated", {
