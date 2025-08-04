@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -151,6 +152,68 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
 const config = getConfig();
 let oauthProvider: OAuthProvider | null = null;
 
+// Rate limiting for OAuth endpoints
+const oauthRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    jsonrpc: "2.0",
+    id: null,
+    error: {
+      code: -32000,
+      message: "Too many requests, please try again later"
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn("Rate limit exceeded for OAuth endpoint", {
+      ip: req.ip,
+      path: req.path,
+      userAgent: req.get('User-Agent')
+    });
+    res.status(429).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32000,
+        message: "Too many requests, please try again later"
+      }
+    });
+  }
+});
+
+// Stricter rate limiting for token endpoint
+const tokenRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 token requests per windowMs
+  message: {
+    jsonrpc: "2.0",
+    id: null,
+    error: {
+      code: -32000,
+      message: "Too many token requests, please try again later"
+    }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn("Rate limit exceeded for token endpoint", {
+      ip: req.ip,
+      path: req.path,
+      userAgent: req.get('User-Agent')
+    });
+    res.status(429).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32000,
+        message: "Too many token requests, please try again later"
+      }
+    });
+  }
+});
+
 // Setup OAuth endpoints and provider when authentication is enabled
 if (config.ENABLE_AUTH) {
   const baseUrl = config.BASE_URL;
@@ -170,9 +233,9 @@ if (config.ENABLE_AUTH) {
   // Extract path from redirect URI for route registration
   const redirectPath = new URL(config.OAUTH_REDIRECT_URI!).pathname;
   
-  app.get("/oauth/authorize", createAuthorizeHandler());
-  app.get(redirectPath, createCallbackHandler(oauthProvider));
-  app.post("/oauth/token", express.urlencoded({ extended: true }), createTokenHandler(oauthProvider));
+  app.get("/oauth/authorize", oauthRateLimit, createAuthorizeHandler());
+  app.get(redirectPath, oauthRateLimit, createCallbackHandler(oauthProvider));
+  app.post("/oauth/token", tokenRateLimit, express.urlencoded({ extended: true }), createTokenHandler(oauthProvider));
   
   logger.info("OAuth 2.1 endpoints registered", { 
     discovery: [
