@@ -21,7 +21,9 @@ const configSchema = z.object({
   OAUTH_SCOPE: z.string().default("openid profile email"),
 });
 
-export type Config = z.infer<typeof configSchema>;
+export type Config = z.infer<typeof configSchema> & {
+  BASE_URL: string;
+};
 
 let config: Config;
 
@@ -30,19 +32,25 @@ export function getConfig(): Config {
     try {
       const parsed = configSchema.parse(process.env);
 
+      if (!parsed.BASE_URL) {
+        parsed.BASE_URL = `http://localhost:${parsed.PORT}`;
+      }
+
       // Full mode validation - OAuth Authorization Server with external IdP
       if (parsed.AUTH_MODE === "full") {
         const requiredVars = [];
         if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
         if (!parsed.OAUTH_CLIENT_ID) requiredVars.push("OAUTH_CLIENT_ID");
-        if (!parsed.OAUTH_CLIENT_SECRET) requiredVars.push("OAUTH_CLIENT_SECRET");
+        if (!parsed.OAUTH_CLIENT_SECRET)
+          requiredVars.push("OAUTH_CLIENT_SECRET");
 
         // Provide default for OAUTH_REDIRECT_URI if not set
         if (!parsed.OAUTH_REDIRECT_URI) {
-          const baseUrl = parsed.BASE_URL || "http://localhost:3000";
-          const callbackUrl = new URL("/callback", baseUrl);
+          const callbackUrl = new URL("/callback", parsed.BASE_URL);
           parsed.OAUTH_REDIRECT_URI = callbackUrl.toString();
-          console.log(`⚠️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`);
+          console.log(
+            `⚠️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`,
+          );
         }
 
         if (requiredVars.length > 0) {
@@ -52,21 +60,20 @@ export function getConfig(): Config {
               "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
               "OAUTH_CLIENT_ID=your-client-id\n" +
               "OAUTH_CLIENT_SECRET=your-client-secret\n" +
-              "OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback\n" +
-              "OAUTH_AUDIENCE=your-api-identifier  # Optional but recommended"
+              "OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback or http://localhost:PORT/callback\n" +
+              "OAUTH_AUDIENCE=your-api-identifier  # Optional but recommended",
           );
         }
 
-        // OAUTH_AUDIENCE is optional but recommended for full mode
+        // OAUTH_AUDIENCE is optional but recommended when a resource server is used
         if (!parsed.OAUTH_AUDIENCE) {
           console.warn(
             "⚠️  OAUTH_AUDIENCE not set for full mode. Token validation will not check audience.\n" +
-              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier"
+              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier",
           );
         }
       }
 
-      // Resource server mode validation
       if (parsed.AUTH_MODE === "resource_server") {
         const requiredVars = [];
         if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
@@ -77,12 +84,12 @@ export function getConfig(): Config {
             `AUTH_MODE=resource_server requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
               "Example configuration:\n" +
               "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
-              "OAUTH_AUDIENCE=your-api-identifier"
+              "OAUTH_AUDIENCE=your-api-identifier",
           );
         }
       }
 
-      config = parsed;
+      config = parsed as Config;
     } catch (error) {
       console.error("❌ Invalid environment configuration:", error);
       process.exit(1);
