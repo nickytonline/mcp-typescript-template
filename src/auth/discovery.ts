@@ -133,8 +133,7 @@ export function createAuthorizeHandler(oauthServer: OAuth2Server) {
 
       logger.info("Authorization code granted", { 
         clientId: authorizationCode.client.id,
-        userId: user.id,
-        code: authorizationCode.authorizationCode.substring(0, 8) + "..."
+        userId: user.id
       });
 
       // Redirect back to client with authorization code
