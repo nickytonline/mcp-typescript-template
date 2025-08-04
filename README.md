@@ -14,6 +14,15 @@ This template provides:
 - **Example Tool** - Simple echo tool to demonstrate MCP tool implementation
 - **Optional OAuth 2.1** - Add authentication when needed with simple configuration
 
+## ⚠️ Production Storage Limitation
+
+[!WARNING]
+**Production Storage Limitation**
+
+This template uses in-memory storage for all OAuth codes, tokens, and session data. All such data will be lost on server restart. This approach is suitable for development and testing only. For production deployments, you must implement persistent storage (e.g., database, external cache) to ensure reliability and compliance.
+
+**Do not use in-memory storage in production environments.**
+
 ## Quick Start
 
 Get your MCP server running immediately:
@@ -187,6 +196,7 @@ When you need OAuth 2.1 authentication with token validation, it's just a few co
 ### Quick Setup
 
 1. **Add to your `.env` file:**
+
    ```bash
    ENABLE_AUTH=true
    OAUTH_ISSUER=https://your-provider.com
@@ -205,19 +215,22 @@ Your MCP server now requires valid OAuth tokens for all API requests.
 ### Use Cases
 
 **Authentication Disabled** (`ENABLE_AUTH=false` or omitted):
+
 - Public MCP servers
 - Gateway-protected deployments (Pomerium, nginx with auth, etc.)
 - Development and testing
 - Internal corporate networks with perimeter security
 
 **Authentication Enabled** (`ENABLE_AUTH=true`):
+
 - Direct OAuth 2.1 with token validation
-- Self-contained secure deployment  
+- Self-contained secure deployment
 - Production servers without gateway infrastructure
 
 ### OAuth Provider Examples
 
 **Auth0:**
+
 ```bash
 ENABLE_AUTH=true
 OAUTH_ISSUER=https://your-domain.auth0.com
@@ -227,6 +240,7 @@ OAUTH_AUDIENCE=your-api-identifier
 ```
 
 **Okta:**
+
 ```bash
 ENABLE_AUTH=true
 OAUTH_ISSUER=https://your-domain.okta.com
@@ -235,6 +249,7 @@ OAUTH_CLIENT_SECRET=your-okta-client-secret
 ```
 
 **Google:**
+
 ```bash
 ENABLE_AUTH=true
 OAUTH_ISSUER=https://accounts.google.com
@@ -252,6 +267,7 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 ### OAuth 2.1 Endpoints (when enabled)
 
 The server automatically provides these endpoints:
+
 - `GET /.well-known/oauth-authorization-server` - OAuth server metadata
 - `GET /.well-known/oauth-protected-resource` - Resource server metadata
 - `GET /oauth/authorize` - Authorization endpoint (with PKCE)
@@ -260,6 +276,7 @@ The server automatically provides these endpoints:
 ### Removing Authentication
 
 To completely remove OAuth support:
+
 1. Delete the `src/auth/` directory
 2. Remove auth imports from `src/index.ts`
 3. Remove OAuth environment variables from `src/config.ts`
