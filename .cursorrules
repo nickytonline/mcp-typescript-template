@@ -105,13 +105,13 @@ The following environment variables are supported (see `src/config.ts`):
 
 ### OAuth Configuration (Optional)
 
-- `ENABLE_AUTH` - Enable OAuth authentication (default: false)
+- `ENABLE_AUTH` - Enable OAuth 2.1 authentication (default: false)
+- `OAUTH_ISSUER` - OAuth issuer URL (required if auth enabled)
 - `OAUTH_CLIENT_ID` - OAuth client ID (required if auth enabled)
 - `OAUTH_CLIENT_SECRET` - OAuth client secret (required if auth enabled)
-- `OAUTH_AUTH_ENDPOINT` - OAuth authorization endpoint (required if auth enabled)
-- `OAUTH_TOKEN_ENDPOINT` - OAuth token endpoint (required if auth enabled)
-- `OAUTH_SCOPE` - OAuth scope (default: "read")
-- `OAUTH_REDIRECT_URI` - OAuth redirect URI (required if auth enabled)
+- `OAUTH_AUDIENCE` - Expected audience in JWT tokens (optional but recommended)
+- `OAUTH_SCOPE` - OAuth scope (default: "openid profile email")
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI (optional, defaults to BASE_URL/callback)
 
 ## Coding Guidelines
 
@@ -135,19 +135,38 @@ The following environment variables are supported (see `src/config.ts`):
 
 ## OAuth Implementation
 
-### Modular Authentication
+### Simple Binary Configuration
 
-The template includes optional OAuth 2.1 authentication that can be easily enabled or completely removed:
+The template includes optional OAuth 2.1 authentication with a simple on/off approach:
 
+- **Default**: No authentication required - server runs immediately with `ENABLE_AUTH=false`
+- **Enable When Needed**: Set `ENABLE_AUTH=true` and provide OAuth configuration
 - **Modular Design**: All OAuth code is in `src/auth/` directory
-- **Conditional Loading**: OAuth middleware only applies when `ENABLE_AUTH=true`
 - **Zero Impact When Disabled**: No performance overhead when authentication is disabled
 - **Easy Removal**: Delete `src/auth/` directory and remove auth import from `src/index.ts`
 
-### Authentication Patterns
+### Use Cases
 
-1. **External OAuth (Recommended)**: Use Pomerium or similar OAuth proxy
-2. **Built-in OAuth Server**: Use the provided OAuth implementation in `src/auth/`
+**Authentication Disabled** (`ENABLE_AUTH=false` or omitted):
+- Public MCP servers
+- Gateway-protected deployments (Pomerium, nginx with auth, etc.)
+- Development and testing
+- Internal corporate networks with perimeter security
+
+**Authentication Enabled** (`ENABLE_AUTH=true`):
+- Direct OAuth 2.1 with token validation
+- Self-contained secure deployment
+- Production servers without gateway infrastructure
+
+### Quick Setup
+
+To enable authentication, add to your `.env`:
+```bash
+ENABLE_AUTH=true
+OAUTH_ISSUER=https://your-provider.com
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+```
 
 ### Removing OAuth
 
