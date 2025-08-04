@@ -84,16 +84,28 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
       logger.warn(
         "POST request without session ID for non-initialization request",
       );
-      res
-        .status(400)
-        .json({ error: "Session ID required for non-initialization requests" });
+      res.status(400).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Session ID required for non-initialization requests"
+        }
+      });
       return;
     }
 
     // Handle unknown session
     if (sessionId && !transports[sessionId]) {
       logger.warn("Request for unknown session", { sessionId });
-      res.status(404).json({ error: "Session not found" });
+      res.status(404).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32000,
+          message: "Session not found"
+        }
+      });
       return;
     }
 
@@ -125,7 +137,14 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
     logger.error("Error handling MCP request", {
       error: error instanceof Error ? error.message : error,
     });
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32603,
+        message: "Internal server error"
+      }
+    });
   }
 };
 
