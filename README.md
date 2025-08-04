@@ -189,7 +189,28 @@ server.registerTool(
 );
 ```
 
-## Enable Authentication (Optional)
+## Authentication Modes
+
+This template supports two modes of operation:
+
+- **Authentication Disabled** (`ENABLE_AUTH=false` or omitted):
+  - No authentication required for MCP server
+
+- **Authentication Enabled** (`ENABLE_AUTH=true`):
+  - OAuth 2.1 authentication and token validation enforced for all MCP server endpoints
+  - Suitable for secure, self-contained deployments or production servers without gateway infrastructure
+
+Switch between modes by setting the `ENABLE_AUTH` environment variable in your `.env` file.
+
+---
+
+### Gateways & Proxies for MCP Security
+
+You can deploy MCP servers behind API gateways, identity-aware proxies (IAP), or AI Gateways, recommended by the [MCP Security Best Practices](https://modelcontextprotocol.org/docs/security#mcp-proxy).
+
+- **Pomerium**: Full MCP support, including OAuth/OIDC authentication, fine-grained access policies, not just for the server but also for at the tool level, and session management. You can run your MCP server with authentication disabled (`ENABLE_AUTH=false`) and let Pomerium handle all security. See: [Pomerium MCP Capabilities](https://docs.pomerium.com/docs/capabilities/mcp).
+
+Have a gateway suggestion? [Create an issue](https://github.com/nickytonline/mcp-typescript-template/issues) to help expand this list!
 
 When you need OAuth 2.1 authentication with token validation, it's just a few config lines away:
 
@@ -218,7 +239,6 @@ Your MCP server now requires valid OAuth tokens for all API requests.
 
 - Public MCP servers
 - Gateway-protected deployments (Pomerium, nginx with auth, etc.)
-- Development and testing
 - Internal corporate networks with perimeter security
 
 **Authentication Enabled** (`ENABLE_AUTH=true`):
