@@ -126,14 +126,14 @@ export class OAuthProvider {
     
     const codeData = this.#authorizationCodes.get(code);
     if (!codeData) {
-      logger.warn("Invalid authorization code", { code: code.substring(0, 8) + "..." });
+      logger.warn("Invalid authorization code", { codeLength: code.length });
       return null;
     }
 
     // Check expiration
     if (codeData.expiresAt < new Date()) {
       this.#authorizationCodes.delete(code);
-      logger.warn("Expired authorization code", { code: code.substring(0, 8) + "..." });
+      logger.warn("Expired authorization code", { codeLength: code.length });
       return null;
     }
 
@@ -150,7 +150,7 @@ export class OAuthProvider {
 
     // PKCE verification
     if (!this.verifyPKCE(codeVerifier, codeData.codeChallenge)) {
-      logger.warn("PKCE verification failed", { code: code.substring(0, 8) + "..." });
+      logger.warn("PKCE verification failed", { codeLength: code.length });
       return null;
     }
 

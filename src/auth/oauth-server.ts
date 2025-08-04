@@ -156,7 +156,7 @@ export class ManagedOAuthServer {
       },
       
       // OAuth 2.1 configuration
-      requireClientAuthentication: { authorization_code: false },
+      requireClientAuthentication: { authorization_code: true },
       allowBearerTokensInQueryString: false,
       accessTokenLifetime: 3600, // 1 hour
       authorizationCodeLifetime: 600, // 10 minutes
