@@ -50,6 +50,7 @@ const app = express();
 app.use(express.json());
 
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+const sessionTimestamps: { [sessionId: string]: Date } = {};
 
 const mcpHandler = async (req: express.Request, res: express.Response) => {
   const sessionId = req.headers["mcp-session-id"] as string | undefined;
@@ -63,6 +64,7 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sessionId) => {
           transports[sessionId] = transport;
+          sessionTimestamps[sessionId] = new Date();
           logger.info("MCP session initialized", { sessionId });
         },
       });
@@ -75,6 +77,8 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
 
     // Handle existing session requests
     if (sessionId && transports[sessionId]) {
+      // Update session timestamp
+      sessionTimestamps[sessionId] = new Date();
       const transport = transports[sessionId];
       await transport.handleRequest(req, res, req.body);
       return;
@@ -148,6 +152,48 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
     });
   }
 };
+
+/**
+ * Clean up stale MCP sessions
+ */
+function cleanupStaleSessions(): void {
+  const now = new Date();
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+  let cleanedCount = 0;
+
+  for (const [sessionId, timestamp] of Object.entries(sessionTimestamps)) {
+    if (now.getTime() - timestamp.getTime() > SESSION_TIMEOUT_MS) {
+      // Close transport if it exists
+      const transport = transports[sessionId];
+      if (transport) {
+        try {
+          transport.close?.();
+        } catch (error) {
+          logger.warn("Error closing stale transport", { 
+            sessionId, 
+            error: error instanceof Error ? error.message : error 
+          });
+        }
+        delete transports[sessionId];
+      }
+      
+      delete sessionTimestamps[sessionId];
+      cleanedCount++;
+      
+      logger.debug("Cleaned up stale MCP session", { sessionId });
+    }
+  }
+
+  if (cleanedCount > 0) {
+    logger.info("MCP session cleanup completed", { 
+      cleanedSessions: cleanedCount,
+      activeSessions: Object.keys(transports).length
+    });
+  }
+}
+
+// Schedule MCP session cleanup every 10 minutes
+setInterval(cleanupStaleSessions, 10 * 60 * 1000);
 
 const config = getConfig();
 let oauthProvider: OAuthProvider | null = null;
