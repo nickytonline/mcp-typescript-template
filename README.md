@@ -192,6 +192,7 @@ When you need OAuth 2.1 authentication with token validation, it's just a few co
    OAUTH_ISSUER=https://your-provider.com
    OAUTH_CLIENT_ID=your-client-id
    OAUTH_CLIENT_SECRET=your-client-secret
+   OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback
    ```
 
 2. **Restart the server**
