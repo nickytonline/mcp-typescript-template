@@ -113,10 +113,10 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         capabilities,
         ...(config.AUTH_MODE !== "none" && {
           oauth: {
-            authorization_server: new URL("/.well-known/oauth-authorization-server", config.BASE_URL || "http://localhost:3000").toString(),
-            protected_resource: new URL("/.well-known/oauth-protected-resource", config.BASE_URL || "http://localhost:3000").toString(),
-            authorization_endpoint: new URL("/oauth/authorize", config.BASE_URL || "http://localhost:3000").toString(),
-            token_endpoint: new URL("/oauth/token", config.BASE_URL || "http://localhost:3000").toString()
+            authorization_server: new URL("/.well-known/oauth-authorization-server", config.BASE_URL).toString(),
+            protected_resource: new URL("/.well-known/oauth-protected-resource", config.BASE_URL).toString(),
+            authorization_endpoint: new URL("/oauth/authorize", config.BASE_URL).toString(),
+            token_endpoint: new URL("/oauth/token", config.BASE_URL).toString()
           }
         })
       });
@@ -133,7 +133,7 @@ const config = getConfig();
 let oauthProvider: OAuthProvider | null = null;
 
 if (config.AUTH_MODE === "full") {
-  const baseUrl = config.BASE_URL || "http://localhost:3000";
+  const baseUrl = config.BASE_URL;
   oauthProvider = new OAuthProvider({
     clientId: "mcp-client",
     clientSecret: "mcp-secret",
