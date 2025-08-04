@@ -1,5 +1,6 @@
 import OAuth2Server from "oauth2-server";
 import { generateChallenge, verifyChallenge } from "pkce-challenge";
+import { randomBytes } from "node:crypto";
 import { logger } from "../logger.ts";
 
 interface Client {
@@ -139,9 +140,11 @@ export class ManagedOAuthServer {
           return token;
         },
 
-        // User verification (simplified for demo)
+        // User verification - should be replaced with real authentication
         getUser: async () => {
-          return { id: "demo-user" };
+          // Generate a unique user ID for each session
+          const userId = `user-${randomBytes(8).toString('hex')}`;
+          return { id: userId };
         },
 
         // Scope verification

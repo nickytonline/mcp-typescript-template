@@ -160,7 +160,7 @@ export class OAuthProvider {
     const expiresIn = 3600;
 
     // Store access token with user info from external tokens
-    const userId = codeData.userId || codeData.externalTokens?.accessToken.substring(0, 8) || "demo-user";
+    const userId = codeData.userId || this.generateUserId();
     this.#accessTokens.set(accessToken, {
       userId,
       scope: codeData.scope,
@@ -213,6 +213,13 @@ export class OAuthProvider {
       userId: tokenData.userId,
       scope: tokenData.scope
     };
+  }
+
+  /**
+   * Generate a unique user ID
+   */
+  private generateUserId(): string {
+    return `user-${randomBytes(16).toString('hex')}`;
   }
 
   /**
