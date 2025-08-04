@@ -198,43 +198,59 @@ server.registerTool(
 
 ## Authentication & Authorization
 
-This template provides **optional** OAuth 2.1 authentication with two deployment patterns:
+This template provides **optional** OAuth 2.1 authentication with three deployment modes. Gateway-based deployment is a common production pattern that separates authentication concerns.
+
+### 📋 Mode Overview
+
+The three authentication modes serve different purposes:
+
+- **`none`** - No authentication (public servers, or when gateway handles all OAuth/security)
+- **`full`** - Complete OAuth flow within MCP server (production-ready when you don't have a gateway)  
+- **`resource_server`** - Only validates tokens (requires either `full` mode or external gateway to issue tokens)
+
+**Key insight**: `resource_server` mode only *validates* tokens - it doesn't *issue* them. So you need either:
+1. **Gateway + resource_server** (common enterprise pattern)
+2. **Full mode standalone** (self-contained OAuth solution)
 
 ### 🔧 Authentication Modes
 
-#### Gateway Mode (Enterprise/Multi-Service)
-- **Resource Server Pattern**: MCP server only validates tokens from external OAuth providers
-- **External OAuth**: Authentication handled by reverse proxy/gateway (Pomerium, nginx, API Gateway)
-- **JWT + Introspection**: Supports both JWT validation and token introspection
+#### Resource Server Mode
+- **Resource Server Pattern**: MCP server validates tokens issued by external OAuth providers
+- **Token Validation**: Supports both JWT validation and token introspection  
 - **Stateless**: No OAuth routes, sessions, or cookies in MCP server
 - **Scalable**: Easy to horizontally scale the MCP server
-- **Best for**: Organizations with existing OAuth infrastructure
+- **Gateway Compatible**: Commonly used with reverse proxies/gateways for enterprise deployments
+- **Best for**: Deployments where authentication is handled externally
 
-#### Built-in Mode (Standalone/Simple Deployment)
-- **OAuth 2.1 Authorization Server**: MCP server IS the complete OAuth authorization server
-- **PKCE Support**: Full PKCE implementation as required by MCP specification
-- **MCP Client Compatible**: Works seamlessly with VS Code and other MCP clients
-- **Self-contained**: No external OAuth provider needed
+#### Full Mode (OAuth Proxy + Resource Server)
+- **Dual Role**: MCP server acts as both OAuth client (proxy) AND resource server
+- **External IdP Integration**: Delegates authentication to external providers (Auth0, Google, etc.)
+- **OAuth Endpoints**: Provides its own OAuth endpoints for MCP clients
+- **PKCE Support**: Full PKCE implementation for secure authorization flows
+- **Self-Contained**: Provides complete OAuth flow without requiring external gateway infrastructure
 - **Discovery Endpoints**: Provides OAuth 2.1 discovery metadata for automatic client configuration
-- **Best for**: Solo developers, small teams, or simple deployments wanting OAuth security
+- **Best for**: Production deployments without gateway infrastructure, provides complete OAuth flow for MCP clients
 
 #### No Auth Mode (Default)
-- **Completely Optional**: Authentication can be disabled entirely
+- **No Authentication**: MCP server accepts all requests without authentication
+- **Use Cases**: Public servers, or when gateway handles all OAuth/security layers
+- **Security Note**: Consider enabling authentication even for local development to build secure habits
+- **Gateway Compatible**: Can still benefit from gateway for rate limiting, SSL termination, etc.
 - **Simple Setup**: Just set `ENABLE_AUTH=false` or omit auth configuration
-- **Open Access**: MCP server accepts all requests without authentication
 
 ### 🚀 Quick Setup
 
-#### 1. Gateway Mode (Enterprise)
+#### 1. Resource Server Mode
 ```bash
 # .env
 ENABLE_AUTH=true
-AUTH_MODE=gateway
+AUTH_MODE=resource_server
 OAUTH_ISSUER=https://your-domain.auth0.com
 OAUTH_AUDIENCE=your-api-identifier  # optional
+# BASE_URL=https://mcp.yourdomain.com  # optional, defaults to http://localhost:PORT
 ```
 
-**Setup your gateway (e.g., Pomerium):**
+**Common Pattern: With Gateway**
 ```yaml
 # pomerium-config.yaml
 routes:
@@ -246,12 +262,24 @@ routes:
             - authenticated_user: true
 ```
 
-#### 2. Built-in Mode (Standalone)
+**Alternative: Direct OAuth**
+```bash
+# Note: MCP clients would need to implement OAuth flow themselves
+# Clients get tokens directly from Auth0, send to MCP server
+curl -H "Authorization: Bearer ${AUTH0_TOKEN}" http://localhost:3000/mcp
+```
+
+#### 2. Full Mode (Self-Contained OAuth)
 ```bash
 # .env
 ENABLE_AUTH=true
-AUTH_MODE=builtin
-# No external OAuth configuration needed - server acts as OAuth provider
+AUTH_MODE=full
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+OAUTH_AUTH_ENDPOINT=https://your-domain.auth0.com/authorize
+OAUTH_TOKEN_ENDPOINT=https://your-domain.auth0.com/oauth/token
+# OAUTH_REDIRECT_URI=http://localhost:3000/callback  # optional, defaults to BASE_URL/callback
+# BASE_URL=https://mcp.yourdomain.com  # optional, defaults to http://localhost:PORT
 ```
 
 **OAuth 2.1 Endpoints (automatically available):**
@@ -267,7 +295,8 @@ AUTH_MODE=builtin
 # .env (or just omit ENABLE_AUTH)
 ENABLE_AUTH=false
 ```
-Server accepts all requests without authentication.
+
+**⚠️ Security Recommendation**: While convenient for getting started, consider enabling authentication even for local development to build secure practices and catch integration issues early.
 
 ### 🔐 Token Validation
 
@@ -282,11 +311,11 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 ### 🏗️ Architecture
 
 ```
-┌─────── Gateway Mode (Enterprise) ───────┐  ┌────── Built-in Mode (Standalone) ───┐  ┌── No Auth (Default) ──┐
+┌─── Resource Server Mode (Production) ───┐  ┌──── Full Mode (Proxy + Resource) ───┐  ┌── No Auth (Default) ──┐
 │                                         │  │                                     │  │                       │
-│  MCP Client → Gateway → MCP Server      │  │  MCP Client → MCP Server           │  │  MCP Client           │
-│              ↓                          │  │              ↓                     │  │      ↓               │
-│       External OAuth (Auth0)            │  │       Built-in OAuth Server       │  │  MCP Server           │
+│  MCP Client → [Gateway] → MCP Server    │  │  MCP Client → MCP Server           │  │  MCP Client           │
+│       ↓                    ↓            │  │              ↓        ↓           │  │      ↓               │
+│  External OAuth → Token Validation      │  │       OAuth Proxy → External IdP  │  │  MCP Server           │
 │                                         │  │                                     │  │   (Open Access)      │
 │  ✅ Enterprise ready                     │  │  ✅ Production ready                │  │  ✅ Simple setup      │
 │  ✅ Stateless & scalable                │  │  ✅ OAuth 2.1 compliant            │  │  ✅ No auth overhead  │
@@ -300,13 +329,13 @@ curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 <details>
 <summary><strong>Auth0 Configuration</strong></summary>
 
-**Gateway Mode:**
+**Resource Server Mode:**
 ```bash
 OAUTH_ISSUER=https://your-domain.auth0.com
 OAUTH_AUDIENCE=your-api-identifier
 ```
 
-**Built-in Mode:**
+**Full Mode:**
 ```bash
 OAUTH_AUTH_ENDPOINT=https://your-domain.auth0.com/authorize
 OAUTH_TOKEN_ENDPOINT=https://your-domain.auth0.com/oauth/token
@@ -318,13 +347,13 @@ OAUTH_CLIENT_SECRET=your-client-secret
 <details>
 <summary><strong>Google OAuth Configuration</strong></summary>
 
-**Gateway Mode:**
+**Resource Server Mode:**
 ```bash
 OAUTH_ISSUER=https://accounts.google.com
 OAUTH_AUDIENCE=your-client-id.apps.googleusercontent.com
 ```
 
-**Built-in Mode:**
+**Full Mode:**
 ```bash
 OAUTH_AUTH_ENDPOINT=https://accounts.google.com/o/oauth2/v2/auth
 OAUTH_TOKEN_ENDPOINT=https://oauth2.googleapis.com/token
