@@ -102,7 +102,7 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
       const config = getConfig();
       const capabilities = ["tools"];
       
-      if (config.AUTH_MODE !== "none") {
+      if (config.ENABLE_AUTH) {
         capabilities.push("oauth");
       }
       
@@ -111,7 +111,7 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         version: config.SERVER_VERSION,
         description: "TypeScript template for building MCP servers",
         capabilities,
-        ...(config.AUTH_MODE !== "none" && {
+        ...(config.ENABLE_AUTH && {
           oauth: {
             authorization_server: new URL("/.well-known/oauth-authorization-server", config.BASE_URL).toString(),
             protected_resource: new URL("/.well-known/oauth-protected-resource", config.BASE_URL).toString(),
@@ -132,7 +132,8 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
 const config = getConfig();
 let oauthProvider: OAuthProvider | null = null;
 
-if (config.AUTH_MODE === "full") {
+// Setup OAuth endpoints and provider when authentication is enabled
+if (config.ENABLE_AUTH) {
   const baseUrl = config.BASE_URL;
   oauthProvider = new OAuthProvider({
     clientId: "mcp-client",
@@ -154,24 +155,28 @@ if (config.AUTH_MODE === "full") {
   app.get(redirectPath, createCallbackHandler(oauthProvider));
   app.post("/oauth/token", express.urlencoded({ extended: true }), createTokenHandler(oauthProvider));
   
-  logger.info("OAuth 2.1 client delegation endpoints registered for full auth mode", { 
+  logger.info("OAuth 2.1 endpoints registered", { 
     discovery: [
       "/.well-known/oauth-authorization-server", 
       "/.well-known/oauth-protected-resource",
       "/.well-known/openid_configuration"
     ],
     endpoints: ["/oauth/authorize", redirectPath, "/oauth/token"],
-    externalIdP: config.OAUTH_ISSUER
+    issuer: config.OAUTH_ISSUER
   });
 }
 
+// Setup authentication middleware
 let authMiddleware;
-if (config.AUTH_MODE === "full" && oauthProvider) {
+if (config.ENABLE_AUTH && oauthProvider) {
   authMiddleware = createOAuthProviderAuthMiddleware(oauthProvider);
-  logger.info("Using OAuthProvider authentication for MCP endpoints");
-} else {
+  logger.info("Using OAuth 2.1 authentication for MCP endpoints");
+} else if (config.ENABLE_AUTH) {
   authMiddleware = createAuthenticationMiddleware();
-  logger.info("Using standard authentication for MCP endpoints");
+  logger.info("Using OAuth 2.1 token validation for MCP endpoints");
+} else {
+  authMiddleware = (_req: any, _res: any, next: any) => next();
+  logger.info("Authentication disabled - MCP endpoints are public");
 }
 
 app.get("/mcp", mcpHandler);

@@ -10,9 +10,13 @@ const configSchema = z.object({
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   BASE_URL: z.string().optional(),
-  AUTH_MODE: z.enum(["none", "full", "resource_server"]).default("none"),
+  ENABLE_AUTH: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((val) => val === "true"),
 
-  // OAuth configuration for external IdP integration
+  // OAuth configuration - required when ENABLE_AUTH=true
   OAUTH_ISSUER: z.string().optional(),
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
@@ -36,55 +40,43 @@ export function getConfig(): Config {
         parsed.BASE_URL = `http://localhost:${parsed.PORT}`;
       }
 
-      // Full mode validation - OAuth Authorization Server with external IdP
-      if (parsed.AUTH_MODE === "full") {
+      // Log authentication status for clarity
+      console.log(`🔐 Authentication: ${parsed.ENABLE_AUTH ? 'ENABLED' : 'DISABLED'}`);
+
+      // OAuth validation when authentication is enabled
+      if (parsed.ENABLE_AUTH) {
         const requiredVars = [];
         if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
         if (!parsed.OAUTH_CLIENT_ID) requiredVars.push("OAUTH_CLIENT_ID");
         if (!parsed.OAUTH_CLIENT_SECRET)
           requiredVars.push("OAUTH_CLIENT_SECRET");
 
+        if (requiredVars.length > 0) {
+          throw new Error(
+            `ENABLE_AUTH=true requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
+              "Example configuration:\n" +
+              "ENABLE_AUTH=true\n" +
+              "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
+              "OAUTH_CLIENT_ID=your-client-id\n" +
+              "OAUTH_CLIENT_SECRET=your-client-secret\n" +
+              "OAUTH_AUDIENCE=your-api-identifier  # Optional but recommended for production",
+          );
+        }
+
         // Provide default for OAUTH_REDIRECT_URI if not set
         if (!parsed.OAUTH_REDIRECT_URI) {
           const callbackUrl = new URL("/callback", parsed.BASE_URL);
           parsed.OAUTH_REDIRECT_URI = callbackUrl.toString();
           console.log(
-            `⚠️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`,
+            `ℹ️  OAUTH_REDIRECT_URI not set, using default: ${parsed.OAUTH_REDIRECT_URI}`,
           );
         }
 
-        if (requiredVars.length > 0) {
-          throw new Error(
-            `AUTH_MODE=full requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
-              "Example configuration:\n" +
-              "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
-              "OAUTH_CLIENT_ID=your-client-id\n" +
-              "OAUTH_CLIENT_SECRET=your-client-secret\n" +
-              "OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback or http://localhost:PORT/callback\n" +
-              "OAUTH_AUDIENCE=your-api-identifier  # Optional but recommended",
-          );
-        }
-
-        // OAUTH_AUDIENCE is optional but recommended when a resource server is used
+        // OAUTH_AUDIENCE is optional but recommended for production
         if (!parsed.OAUTH_AUDIENCE) {
           console.warn(
-            "⚠️  OAUTH_AUDIENCE not set for full mode. Token validation will not check audience.\n" +
-              "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier",
-          );
-        }
-      }
-
-      if (parsed.AUTH_MODE === "resource_server") {
-        const requiredVars = [];
-        if (!parsed.OAUTH_ISSUER) requiredVars.push("OAUTH_ISSUER");
-        if (!parsed.OAUTH_AUDIENCE) requiredVars.push("OAUTH_AUDIENCE");
-
-        if (requiredVars.length > 0) {
-          throw new Error(
-            `AUTH_MODE=resource_server requires OAuth configuration. Missing: ${requiredVars.join(", ")}\n` +
-              "Example configuration:\n" +
-              "OAUTH_ISSUER=https://your-domain.auth0.com\n" +
-              "OAUTH_AUDIENCE=your-api-identifier",
+            "⚠️  OAUTH_AUDIENCE not set. Token validation will not check audience.\n" +
+            "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier",
           );
         }
       }
