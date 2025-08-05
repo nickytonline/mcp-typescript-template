@@ -9,7 +9,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 export function createTextResult(data: unknown): CallToolResult {
   // Handle undefined gracefully by converting to null
   const safeData = data === undefined ? null : data;
-  
+
   return {
     content: [
       {

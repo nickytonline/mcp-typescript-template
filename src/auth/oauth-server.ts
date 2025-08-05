@@ -65,13 +65,13 @@ export class ManagedOAuthServer {
             codeChallenge: (code as any).codeChallenge,
             codeChallengeMethod: (code as any).codeChallengeMethod,
           };
-          
+
           this.#authorizationCodes.set(code.authorizationCode, authCode);
-          logger.info("Authorization code saved", { 
+          logger.info("Authorization code saved", {
             clientId: client.id,
-            userId: user.id 
+            userId: user.id,
           });
-          
+
           return authCode;
         },
 
@@ -95,14 +95,16 @@ export class ManagedOAuthServer {
 
         // PKCE verification
         verifyCodeChallenge: async (authorizationCode, codeVerifier) => {
-          const code = this.#authorizationCodes.get(authorizationCode.authorizationCode);
+          const code = this.#authorizationCodes.get(
+            authorizationCode.authorizationCode,
+          );
           if (!code || !code.codeChallenge) return false;
 
           try {
             return verifyChallenge(codeVerifier, code.codeChallenge);
           } catch (error) {
-            logger.warn("PKCE verification failed", { 
-              error: error instanceof Error ? error.message : error 
+            logger.warn("PKCE verification failed", {
+              error: error instanceof Error ? error.message : error,
             });
             return false;
           }
@@ -119,9 +121,9 @@ export class ManagedOAuthServer {
           };
 
           this.#accessTokens.set(token.accessToken, accessToken);
-          logger.info("Access token saved", { 
+          logger.info("Access token saved", {
             clientId: client.id,
-            userId: user.id 
+            userId: user.id,
           });
 
           return accessToken;
@@ -143,7 +145,7 @@ export class ManagedOAuthServer {
         // User verification - should be replaced with real authentication
         getUser: async () => {
           // Generate a unique user ID for each session
-          const userId = `user-${randomBytes(8).toString('hex')}`;
+          const userId = `user-${randomBytes(8).toString("hex")}`;
           return { id: userId };
         },
 
@@ -157,7 +159,7 @@ export class ManagedOAuthServer {
           return scope === "read" || scope === "write";
         },
       },
-      
+
       // OAuth 2.1 configuration
       requireClientAuthentication: { authorization_code: true },
       allowBearerTokensInQueryString: false,
@@ -182,7 +184,7 @@ export class ManagedOAuthServer {
       grants: ["authorization_code"],
       redirectUris,
     });
-    
+
     logger.info("OAuth client registered", { clientId, redirectUris });
   }
 
@@ -193,8 +195,8 @@ export class ManagedOAuthServer {
     try {
       return verifyChallenge(codeVerifier, codeChallenge);
     } catch (error) {
-      logger.warn("PKCE validation failed", { 
-        error: error instanceof Error ? error.message : error 
+      logger.warn("PKCE validation failed", {
+        error: error instanceof Error ? error.message : error,
       });
       return false;
     }

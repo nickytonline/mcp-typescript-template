@@ -5,7 +5,7 @@ describe("createTextResult", () => {
   // Mock data for testing
   const mockData = {
     echo: "Hello world",
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
 
   it("should create a CallToolResult with correct structure", () => {
