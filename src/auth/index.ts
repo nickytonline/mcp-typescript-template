@@ -17,15 +17,15 @@ export function initializeAuth() {
   logger.info("Initializing OAuth 2.1 authentication with token validation", {
     issuer: config.OAUTH_ISSUER,
     audience: config.OAUTH_AUDIENCE,
-    clientId: config.OAUTH_CLIENT_ID
+    clientId: config.OAUTH_CLIENT_ID,
   });
-  
+
   // Create token validator for OAuth 2.1 token validation
   const tokenValidator = new OAuthTokenValidator(
     config.OAUTH_ISSUER!,
-    config.OAUTH_AUDIENCE
+    config.OAUTH_AUDIENCE,
   );
-  
+
   return { tokenValidator };
 }
 

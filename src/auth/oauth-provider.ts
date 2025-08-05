@@ -41,29 +41,32 @@ interface AuthorizationCodeData {
 export class OAuthProvider {
   #config: OAuthConfig;
   #tokenValidator: OAuthTokenValidator;
-  
+
   // In-memory stores (use database in production)
   #authorizationCodes = new Map<string, AuthorizationCodeData>();
-  #accessTokens = new Map<string, { 
-    userId: string; 
-    scope: string; 
-    expiresAt: Date;
-    externalTokens?: {
-      accessToken: string;
-      refreshToken?: string;
-      idToken?: string;
+  #accessTokens = new Map<
+    string,
+    {
+      userId: string;
+      scope: string;
       expiresAt: Date;
-      scope?: string;
-    };
-  }>();
+      externalTokens?: {
+        accessToken: string;
+        refreshToken?: string;
+        idToken?: string;
+        expiresAt: Date;
+        scope?: string;
+      };
+    }
+  >();
 
   constructor(config: OAuthConfig) {
     this.#config = config;
-    
+
     // For built-in mode, we ARE the issuer
     const issuer = "http://localhost:3000"; // This should be dynamic based on server config
     this.#tokenValidator = new OAuthTokenValidator(issuer);
-    
+
     // Clean up expired codes and tokens periodically
     setInterval(() => this.cleanup(), 60 * 1000); // Every minute
   }
@@ -80,7 +83,7 @@ export class OAuthProvider {
     logger.info("Authorization code stored", {
       code: code.substring(0, 8) + "...",
       clientId: data.clientId,
-      hasExternalTokens: !!data.externalTokens
+      hasExternalTokens: !!data.externalTokens,
     });
   }
 
@@ -88,8 +91,8 @@ export class OAuthProvider {
    * Store authorization code with external token data from IdP
    */
   storeAuthorizationCodeWithTokens(
-    code: string, 
-    data: Omit<AuthorizationCodeData, 'externalTokens'>, 
+    code: string,
+    data: Omit<AuthorizationCodeData, "externalTokens">,
     externalTokens: {
       accessToken: string;
       refreshToken?: string;
@@ -97,7 +100,7 @@ export class OAuthProvider {
       expiresIn: number;
       scope?: string;
     },
-    userId?: string
+    userId?: string,
   ): void {
     const authCodeData: AuthorizationCodeData = {
       ...data,
@@ -107,10 +110,10 @@ export class OAuthProvider {
         refreshToken: externalTokens.refreshToken,
         idToken: externalTokens.idToken,
         expiresAt: new Date(Date.now() + externalTokens.expiresIn * 1000),
-        scope: externalTokens.scope
-      }
+        scope: externalTokens.scope,
+      },
     };
-    
+
     this.storeAuthorizationCode(code, authCodeData);
   }
 
@@ -118,12 +121,11 @@ export class OAuthProvider {
    * Exchange authorization code for access token with PKCE verification
    */
   async exchangeAuthorizationCode(
-    code: string, 
-    codeVerifier: string, 
-    clientId: string, 
-    redirectUri: string
+    code: string,
+    codeVerifier: string,
+    clientId: string,
+    redirectUri: string,
   ): Promise<{ accessToken: string; expiresIn: number; scope: string } | null> {
-    
     const codeData = this.#authorizationCodes.get(code);
     if (!codeData) {
       logger.warn("Invalid authorization code", { codeLength: code.length });
@@ -138,12 +140,15 @@ export class OAuthProvider {
     }
 
     // Validate client_id and redirect_uri
-    if (codeData.clientId !== clientId || codeData.redirectUri !== redirectUri) {
-      logger.warn("Authorization code validation failed", { 
+    if (
+      codeData.clientId !== clientId ||
+      codeData.redirectUri !== redirectUri
+    ) {
+      logger.warn("Authorization code validation failed", {
         expectedClientId: codeData.clientId,
         providedClientId: clientId,
         expectedRedirectUri: codeData.redirectUri,
-        providedRedirectUri: redirectUri
+        providedRedirectUri: redirectUri,
       });
       return null;
     }
@@ -165,22 +170,22 @@ export class OAuthProvider {
       userId,
       scope: codeData.scope,
       expiresAt,
-      externalTokens: codeData.externalTokens
+      externalTokens: codeData.externalTokens,
     });
 
     // Clean up authorization code (single use)
     this.#authorizationCodes.delete(code);
 
-    logger.info("Access token issued", { 
-      clientId, 
+    logger.info("Access token issued", {
+      clientId,
       scope: codeData.scope,
-      expiresIn 
+      expiresIn,
     });
 
     return {
       accessToken,
       expiresIn,
-      scope: codeData.scope
+      scope: codeData.scope,
     };
   }
 
@@ -188,17 +193,19 @@ export class OAuthProvider {
    * Verify PKCE code verifier against challenge
    */
   private verifyPKCE(codeVerifier: string, codeChallenge: string): boolean {
-    const hash = createHash('sha256').update(codeVerifier).digest();
-    const computedChallenge = hash.toString('base64url');
+    const hash = createHash("sha256").update(codeVerifier).digest();
+    const computedChallenge = hash.toString("base64url");
     return computedChallenge === codeChallenge;
   }
 
   /**
    * Validate access token
    */
-  async validateToken(token: string): Promise<{ valid: boolean; userId?: string; scope?: string }> {
+  async validateToken(
+    token: string,
+  ): Promise<{ valid: boolean; userId?: string; scope?: string }> {
     const tokenData = this.#accessTokens.get(token);
-    
+
     if (!tokenData) {
       return { valid: false };
     }
@@ -211,7 +218,7 @@ export class OAuthProvider {
     return {
       valid: true,
       userId: tokenData.userId,
-      scope: tokenData.scope
+      scope: tokenData.scope,
     };
   }
 
@@ -219,7 +226,7 @@ export class OAuthProvider {
    * Generate a unique user ID
    */
   private generateUserId(): string {
-    return `user-${randomBytes(16).toString('hex')}`;
+    return `user-${randomBytes(16).toString("hex")}`;
   }
 
   /**
@@ -227,14 +234,14 @@ export class OAuthProvider {
    */
   private cleanup(): void {
     const now = new Date();
-    
+
     // Clean up expired authorization codes
     for (const [code, data] of this.#authorizationCodes.entries()) {
       if (data.expiresAt < now) {
         this.#authorizationCodes.delete(code);
       }
     }
-    
+
     // Clean up expired access tokens
     for (const [token, data] of this.#accessTokens.entries()) {
       if (data.expiresAt < now) {
@@ -242,5 +249,4 @@ export class OAuthProvider {
       }
     }
   }
-
 }
