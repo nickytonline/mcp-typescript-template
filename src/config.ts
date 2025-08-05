@@ -40,8 +40,9 @@ export function getConfig(): Config {
         parsed.BASE_URL = `http://localhost:${parsed.PORT}`;
       }
 
-      // Log authentication status for clarity
-      console.log(`🔐 Authentication: ${parsed.ENABLE_AUTH ? 'ENABLED' : 'DISABLED'}`);
+      console.log(
+        `🔐 Authentication: ${parsed.ENABLE_AUTH ? "ENABLED" : "DISABLED"}`,
+      );
 
       // OAuth validation when authentication is enabled
       if (parsed.ENABLE_AUTH) {
@@ -75,8 +76,8 @@ export function getConfig(): Config {
         // OAUTH_AUDIENCE is optional but recommended for production
         if (!parsed.OAUTH_AUDIENCE) {
           console.warn(
-            "⚠️  OAUTH_AUDIENCE not set. Token validation will not check audience.\n" +
-            "   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier",
+            `⚠️  OAUTH_AUDIENCE not set. Token validation will not check audience.
+   For production deployments, consider setting OAUTH_AUDIENCE to your API identifier`,
           );
         }
       }
