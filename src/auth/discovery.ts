@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import OAuth2Server from "@node-oauth/oauth2-server";
 import { logger } from "../logger.ts";
 
 /**
