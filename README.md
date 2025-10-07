@@ -194,3 +194,7 @@ This template uses Express for the HTTP server, which provides:
 - **Middleware Ecosystem** - Rich ecosystem of middleware for common tasks
 - **Documentation** - Comprehensive documentation and community support
 - **Reliability** - Proven reliability for production applications
+
+## Repository Guidelines
+
+Contributors should review `AGENTS.md` for project structure, coding standards, and pull request expectations before opening changes.
