@@ -44,7 +44,7 @@ The template includes one example tool to demonstrate MCP tool implementation:
 ### Build System
 
 - Uses Vite for building with ES modules output format
-- TypeScript compilation targeting Node.js 18+ 
+- TypeScript compilation targeting Node.js 22.18+ (native type stripping enabled by default)
 - External dependency: `@modelcontextprotocol/sdk` (not bundled)
 - Source alias `@` points to `src/` directory
 - Output goes to `dist/` directory
