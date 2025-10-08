@@ -74,6 +74,16 @@ See `src/config.ts` for all supported environment variables:
 - `SERVER_VERSION` - Server version
 - `LOG_LEVEL` - Logging level (error/warn/info/debug)
 
+### OAuth Configuration (Optional)
+
+- `ENABLE_AUTH` - Enable OAuth 2.1 authentication (default: false)
+- `OAUTH_ISSUER` - OAuth issuer URL (required if auth enabled)
+- `OAUTH_CLIENT_ID` - OAuth client ID (required if auth enabled)
+- `OAUTH_CLIENT_SECRET` - OAuth client secret (required if auth enabled)
+- `OAUTH_AUDIENCE` - Expected audience in JWT tokens (optional but recommended)
+- `OAUTH_SCOPE` - OAuth scope (default: "openid profile email")
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI (optional, defaults to BASE_URL/callback)
+
 ## Common Patterns
 
 ### Adding a New MCP Tool
@@ -134,9 +144,30 @@ const port = config.PORT;
 const serverName = config.SERVER_NAME;
 ```
 
+## Authentication
+
+### Simple Binary Configuration
+
+The template includes optional OAuth 2.1 authentication:
+
+- **Default**: No authentication required (`ENABLE_AUTH=false`)
+- **Enable when needed**: Set `ENABLE_AUTH=true` and provide OAuth config
+- **Use cases**: Public servers (auth disabled) or secure deployments (auth enabled)
+
+### Quick Setup
+
+To enable authentication, add to `.env`:
+```bash
+ENABLE_AUTH=true
+OAUTH_ISSUER=https://your-provider.com
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+```
+
 ## Important Notes
 
 - **File extensions**: Use `.js` in import statements (TypeScript compilation requirement)
 - **OpenTelemetry ready**: Logger automatically correlates with OTel traces when configured
 - **Production ready**: Includes graceful shutdown, error handling, and structured logging
 - **Template usage**: This is a template - customize for your specific MCP server needs
+- **Authentication**: Server starts immediately with no auth setup required, add OAuth when needed
