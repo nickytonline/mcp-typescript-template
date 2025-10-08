@@ -1,5 +1,4 @@
 import express from "express";
-import rateLimit from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -9,17 +8,10 @@ import { createTextResult } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
 import { createAuthenticationMiddleware } from "./auth/index.ts";
-import { createOAuthProviderAuthMiddleware } from "./auth/middleware.ts";
-import { 
-  createAuthorizationServerMetadataHandler, 
-  createProtectedResourceMetadataHandler
-} from "./auth/discovery.ts";
 import {
-  createAuthorizeHandler,
-  createCallbackHandler,
-  createTokenHandler
-} from "./auth/routes.ts";
-import { OAuthProvider } from "./auth/oauth-provider.ts";
+  createAuthorizationServerMetadataHandler,
+  createProtectedResourceMetadataHandler,
+} from "./auth/discovery.ts";
 
 const getServer = () => {
   const config = getConfig();
@@ -94,8 +86,8 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         id: null,
         error: {
           code: -32600,
-          message: "Session ID required for non-initialization requests"
-        }
+          message: "Session ID required for non-initialization requests",
+        },
       });
       return;
     }
@@ -108,8 +100,8 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         id: null,
         error: {
           code: -32000,
-          message: "Session not found"
-        }
+          message: "Session not found",
+        },
       });
       return;
     }
@@ -118,11 +110,11 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
     if (req.method === "GET") {
       const config = getConfig();
       const capabilities = ["tools"];
-      
+
       if (config.ENABLE_AUTH) {
         capabilities.push("oauth");
       }
-      
+
       res.json({
         name: config.SERVER_NAME,
         version: config.SERVER_VERSION,
@@ -130,12 +122,17 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         capabilities,
         ...(config.ENABLE_AUTH && {
           oauth: {
-            authorization_server: new URL("/.well-known/oauth-authorization-server", config.BASE_URL).toString(),
-            protected_resource: new URL("/.well-known/oauth-protected-resource", config.BASE_URL).toString(),
-            authorization_endpoint: new URL("/oauth/authorize", config.BASE_URL).toString(),
-            token_endpoint: new URL("/oauth/token", config.BASE_URL).toString()
-          }
-        })
+            // Point directly to Auth0 for OAuth
+            authorization_endpoint: new URL(
+              "/oauth/authorize",
+              config.OAUTH_ISSUER,
+            ).toString(),
+            token_endpoint: new URL(
+              "/oauth/token",
+              config.OAUTH_ISSUER,
+            ).toString(),
+          },
+        }),
       });
     }
   } catch (error) {
@@ -147,8 +144,8 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
       id: null,
       error: {
         code: -32603,
-        message: "Internal server error"
-      }
+        message: "Internal server error",
+      },
     });
   }
 };
@@ -169,25 +166,25 @@ function cleanupStaleSessions(): void {
         try {
           transport.close?.();
         } catch (error) {
-          logger.warn("Error closing stale transport", { 
-            sessionId, 
-            error: error instanceof Error ? error.message : error 
+          logger.warn("Error closing stale transport", {
+            sessionId,
+            error: error instanceof Error ? error.message : error,
           });
         }
         delete transports[sessionId];
       }
-      
+
       delete sessionTimestamps[sessionId];
       cleanedCount++;
-      
+
       logger.debug("Cleaned up stale MCP session", { sessionId });
     }
   }
 
   if (cleanedCount > 0) {
-    logger.info("MCP session cleanup completed", { 
+    logger.info("MCP session cleanup completed", {
       cleanedSessions: cleanedCount,
-      activeSessions: Object.keys(transports).length
+      activeSessions: Object.keys(transports).length,
     });
   }
 }
@@ -196,110 +193,36 @@ function cleanupStaleSessions(): void {
 setInterval(cleanupStaleSessions, 10 * 60 * 1000);
 
 const config = getConfig();
-let oauthProvider: OAuthProvider | null = null;
 
-// Rate limiting for OAuth endpoints
-const oauthRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    jsonrpc: "2.0",
-    id: null,
-    error: {
-      code: -32000,
-      message: "Too many requests, please try again later"
-    }
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    logger.warn("Rate limit exceeded for OAuth endpoint", {
-      ip: req.ip,
-      path: req.path,
-      userAgent: req.get('User-Agent')
-    });
-    res.status(429).json({
-      jsonrpc: "2.0",
-      id: null,
-      error: {
-        code: -32000,
-        message: "Too many requests, please try again later"
-      }
-    });
-  }
-});
-
-// Stricter rate limiting for token endpoint
-const tokenRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 token requests per windowMs
-  message: {
-    jsonrpc: "2.0",
-    id: null,
-    error: {
-      code: -32000,
-      message: "Too many token requests, please try again later"
-    }
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    logger.warn("Rate limit exceeded for token endpoint", {
-      ip: req.ip,
-      path: req.path,
-      userAgent: req.get('User-Agent')
-    });
-    res.status(429).json({
-      jsonrpc: "2.0",
-      id: null,
-      error: {
-        code: -32000,
-        message: "Too many token requests, please try again later"
-      }
-    });
-  }
-});
-
-// Setup OAuth endpoints and provider when authentication is enabled
+// Setup OAuth discovery and authentication middleware
 if (config.ENABLE_AUTH) {
-  const baseUrl = config.BASE_URL;
-  oauthProvider = new OAuthProvider({
-    clientId: "mcp-client",
-    clientSecret: "mcp-secret",
-    authorizationEndpoint: new URL("/oauth/authorize", baseUrl).toString(),
-    tokenEndpoint: new URL("/oauth/token", baseUrl).toString(),
-    scope: config.OAUTH_SCOPE,
-    redirectUri: config.OAUTH_REDIRECT_URI!
-  });
-  
-  app.get("/.well-known/oauth-authorization-server", createAuthorizationServerMetadataHandler());
-  app.get("/.well-known/oauth-protected-resource", createProtectedResourceMetadataHandler());
-  app.get("/.well-known/openid_configuration", createAuthorizationServerMetadataHandler());
-  
-  // Extract path from redirect URI for route registration
-  const redirectPath = new URL(config.OAUTH_REDIRECT_URI!).pathname;
-  
-  app.get("/oauth/authorize", oauthRateLimit, createAuthorizeHandler());
-  app.get(redirectPath, oauthRateLimit, createCallbackHandler(oauthProvider));
-  app.post("/oauth/token", tokenRateLimit, express.urlencoded({ extended: true }), createTokenHandler(oauthProvider));
-  
-  logger.info("OAuth 2.1 endpoints registered", { 
+  // Serve OAuth discovery endpoints pointing to Auth0
+  app.get(
+    "/.well-known/oauth-authorization-server",
+    createAuthorizationServerMetadataHandler(),
+  );
+  app.get(
+    "/.well-known/oauth-protected-resource",
+    createProtectedResourceMetadataHandler(),
+  );
+  app.get(
+    "/.well-known/openid_configuration",
+    createAuthorizationServerMetadataHandler(),
+  );
+
+  logger.info("OAuth discovery endpoints registered", {
     discovery: [
-      "/.well-known/oauth-authorization-server", 
+      "/.well-known/oauth-authorization-server",
       "/.well-known/oauth-protected-resource",
-      "/.well-known/openid_configuration"
+      "/.well-known/openid_configuration",
     ],
-    endpoints: ["/oauth/authorize", redirectPath, "/oauth/token"],
-    issuer: config.OAUTH_ISSUER
+    issuer: config.OAUTH_ISSUER,
   });
 }
 
-// Setup authentication middleware
+// Setup authentication middleware (token validation only)
 let authMiddleware;
-if (config.ENABLE_AUTH && oauthProvider) {
-  authMiddleware = createOAuthProviderAuthMiddleware(oauthProvider);
-  logger.info("Using OAuth 2.1 authentication for MCP endpoints");
-} else if (config.ENABLE_AUTH) {
+if (config.ENABLE_AUTH) {
   authMiddleware = createAuthenticationMiddleware();
   logger.info("Using OAuth 2.1 token validation for MCP endpoints");
 } else {

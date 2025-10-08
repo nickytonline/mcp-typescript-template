@@ -1,27 +1,41 @@
 import type { Request, Response } from "express";
 import { logger } from "../logger.ts";
+import { getConfig } from "../config.ts";
 
 /**
  * OAuth 2.0 Authorization Server Metadata endpoint
  * RFC 8414: https://tools.ietf.org/html/rfc8414
  *
- * For AUTH_MODE=full, this describes our OAuth client proxy endpoints
+ * Points to the external OAuth provider (e.g., Auth0) so clients authenticate directly
  */
 export function createAuthorizationServerMetadataHandler() {
   return (req: Request, res: Response) => {
     try {
-      // ...existing code...
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const config = getConfig();
 
+      if (!config.ENABLE_AUTH) {
+        return res.status(500).json({
+          error: "server_error",
+          error_description: "Authentication not configured",
+        });
+      }
+
+      // Point to the external OAuth provider (Auth0) directly
       const metadata = {
-        issuer: baseUrl,
-        authorization_endpoint: new URL("/oauth/authorize", baseUrl).toString(),
-        token_endpoint: new URL("/oauth/token", baseUrl).toString(),
+        issuer: config.OAUTH_ISSUER,
+        authorization_endpoint: new URL(
+          "/oauth/authorize",
+          config.OAUTH_ISSUER,
+        ).toString(),
+        token_endpoint: new URL("/oauth/token", config.OAUTH_ISSUER).toString(),
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
-        scopes_supported: ["read", "write", "mcp"],
-        token_endpoint_auth_methods_supported: ["none"],
+        scopes_supported: config.OAUTH_SCOPE.split(" "),
+        token_endpoint_auth_methods_supported: [
+          "client_secret_post",
+          "client_secret_basic",
+        ],
       };
 
       logger.info("OAuth authorization server metadata requested", {
@@ -45,23 +59,32 @@ export function createAuthorizationServerMetadataHandler() {
  * OAuth 2.0 Protected Resource Metadata endpoint
  * RFC 8705: https://tools.ietf.org/html/rfc8705
  *
- * For AUTH_MODE=full, this describes our resource server capabilities
+ * Describes this server as a protected resource using external OAuth provider
  */
 export function createProtectedResourceMetadataHandler() {
   return (req: Request, res: Response) => {
     try {
+      const config = getConfig();
       const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+      if (!config.ENABLE_AUTH) {
+        return res.status(500).json({
+          error: "server_error",
+          error_description: "Authentication not configured",
+        });
+      }
 
       const metadata = {
         resource: baseUrl,
-        authorization_servers: [baseUrl],
-        scopes_supported: ["read", "write", "mcp"],
+        authorization_servers: [config.OAUTH_ISSUER], // Point to Auth0
+        scopes_supported: config.OAUTH_SCOPE.split(" "),
         bearer_methods_supported: ["header"],
         resource_documentation: new URL("/docs", baseUrl).toString(),
       };
 
       logger.info("OAuth protected resource metadata requested", {
         resource: metadata.resource,
+        authorization_servers: metadata.authorization_servers,
       });
 
       res.json(metadata);

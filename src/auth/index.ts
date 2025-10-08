@@ -14,6 +14,7 @@ export function initializeAuth() {
     return { tokenValidator: null };
   }
 
+  // TypeScript now knows config.ENABLE_AUTH is true due to discriminated union
   logger.info("Initializing OAuth 2.1 authentication with token validation", {
     issuer: config.OAUTH_ISSUER,
     audience: config.OAUTH_AUDIENCE,
@@ -22,7 +23,7 @@ export function initializeAuth() {
 
   // Create token validator for OAuth 2.1 token validation
   const tokenValidator = new OAuthTokenValidator(
-    config.OAUTH_ISSUER!,
+    config.OAUTH_ISSUER,
     config.OAUTH_AUDIENCE,
   );
 

@@ -3,8 +3,7 @@ import { logger } from "../logger.ts";
 import { OAuthTokenValidator } from "./token-validator.ts";
 
 export interface OAuthConfig {
-  clientId: string;
-  clientSecret: string;
+  clientId: string; // Public client ID - no secret needed with PKCE
   authorizationEndpoint: string;
   tokenEndpoint: string;
   scope: string;

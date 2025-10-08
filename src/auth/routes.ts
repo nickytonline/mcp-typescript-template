@@ -42,6 +42,15 @@ export function createAuthorizeHandler() {
       });
 
       const config = getConfig();
+
+      // Auth routes are only registered when ENABLE_AUTH is true
+      if (!config.ENABLE_AUTH) {
+        return res.status(500).json({
+          error: "server_error",
+          error_description: "Authentication not configured",
+        });
+      }
+
       const {
         response_type,
         client_id,
@@ -100,10 +109,10 @@ export function createAuthorizeHandler() {
       });
 
       // Build authorization URL for external provider with our own PKCE
-      const authUrl = new URL("/oauth/authorize", config.OAUTH_ISSUER!);
+      const authUrl = new URL("/oauth/authorize", config.OAUTH_ISSUER);
       authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("client_id", config.OAUTH_CLIENT_ID!);
-      authUrl.searchParams.set("redirect_uri", config.OAUTH_REDIRECT_URI!);
+      authUrl.searchParams.set("client_id", config.OAUTH_CLIENT_ID);
+      authUrl.searchParams.set("redirect_uri", config.OAUTH_REDIRECT_URI);
       authUrl.searchParams.set(
         "scope",
         (scope as string) || "openid profile email",
@@ -119,7 +128,7 @@ export function createAuthorizeHandler() {
         requestId,
         external_auth_url: new URL(
           "/oauth/authorize",
-          config.OAUTH_ISSUER!,
+          config.OAUTH_ISSUER,
         ).toString(),
       });
 
@@ -297,14 +306,19 @@ async function exchangeCodeForTokens(
   codeVerifier: string,
 ): Promise<TokenExchangeResponse | null> {
   try {
-    const tokenEndpoint = new URL("/oauth/token", config.OAUTH_ISSUER!);
+    // This function is only called from handlers that verify ENABLE_AUTH
+    if (!config.ENABLE_AUTH) {
+      throw new Error("Authentication not configured");
+    }
+
+    const tokenEndpoint = new URL("/oauth/token", config.OAUTH_ISSUER);
 
     const tokenParams = new URLSearchParams({
       grant_type: "authorization_code",
-      client_id: config.OAUTH_CLIENT_ID!,
-      client_secret: config.OAUTH_CLIENT_SECRET!,
+      client_id: config.OAUTH_CLIENT_ID,
+      client_secret: config.OAUTH_CLIENT_SECRET,
       code,
-      redirect_uri: config.OAUTH_REDIRECT_URI!,
+      redirect_uri: config.OAUTH_REDIRECT_URI,
       code_verifier: codeVerifier,
     });
 
