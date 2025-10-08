@@ -1,4 +1,4 @@
-{
+ {
   "name": "mcp-typescript-template",
   "version": "1.0.0",
   "description": "TypeScript template for building MCP servers",
@@ -28,12 +28,17 @@
     "node": ">=22.18.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@types/node": "^24.7.0",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
     "concurrently": "^9.2.0",
     "eslint": "^8.0.0",
     "prettier": "^3.0.0",
+    "semantic-release": "^24.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.9",
     "vitest": "^3.2.4"
