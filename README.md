@@ -12,34 +12,28 @@ This template provides:
 - **ESLint + Prettier** - Code quality and formatting
 - **Docker** - Containerization support
 - **Example Tool** - Simple echo tool to demonstrate MCP tool implementation
+- **Optional OAuth 2.1** - Add authentication when needed with simple configuration
 
-## Getting Started
+## ⚠️ Production Storage Limitation
 
-1. **Clone or use this template**
+[!WARNING]
+**Production Storage Limitation**
 
-   ```bash
-   git clone <your-repo-url>
-   cd mcp-typescript-template
-   ```
+This template uses in-memory storage for all OAuth codes, tokens, and session data. All such data will be lost on server restart. This approach is suitable for development and testing only. For production deployments, you must implement persistent storage (e.g., database, external cache) to ensure reliability and compliance.
 
-2. **Install dependencies**
+**Do not use in-memory storage in production environments.**
 
-   ```bash
-   npm install
-   ```
+## Quick Start
 
-3. **Build the project**
+Get your MCP server running immediately:
 
-   ```bash
-   npm run build
-   ```
+```bash
+git clone <your-repo-url>
+cd mcp-typescript-template
+npm install && npm run dev
+```
 
-4. **Start the server**
-   ```bash
-   npm start
-   ```
-
-The server will be available at `http://localhost:3000` for MCP connections.
+That's it! Your MCP server is now running at `http://localhost:3000` with no authentication required.
 
 ## Development
 
@@ -141,8 +135,19 @@ docker-compose up --build
 ```
 mcp-typescript-template/
 ├── src/
+│   ├── auth/             # Optional OAuth authentication module
+│   │   ├── index.ts      # Auth initialization and middleware factory
+│   │   ├── middleware.ts # Authentication middleware
+│   │   ├── oauth-provider.ts # OAuth client implementation
+│   │   ├── routes.ts     # OAuth routes (/authorize, /callback)
+│   │   └── token-validator.ts # Token validation (gateway/builtin)
+│   ├── lib/
+│   │   └── utils.ts      # MCP utility functions
+│   ├── config.ts         # Environment configuration with validation
+│   ├── logger.ts         # Structured logging with Pino
 │   └── index.ts          # Main MCP server entry point
 ├── dist/                 # Built output (generated)
+├── .env.example          # Environment variables template
 ├── .eslintrc.js         # ESLint configuration
 ├── .prettierrc          # Prettier configuration
 ├── tsconfig.json        # TypeScript configuration
@@ -183,6 +188,120 @@ server.registerTool(
   },
 );
 ```
+
+## Authentication Modes
+
+This template supports two modes of operation:
+
+- **Authentication Disabled** (`ENABLE_AUTH=false` or omitted):
+  - No authentication required for MCP server
+
+- **Authentication Enabled** (`ENABLE_AUTH=true`):
+  - OAuth 2.1 authentication and token validation enforced for all MCP server endpoints
+  - Suitable for secure, self-contained deployments or production servers without gateway infrastructure
+
+Switch between modes by setting the `ENABLE_AUTH` environment variable in your `.env` file.
+
+---
+
+### Gateways & Proxies for MCP Security
+
+You can deploy MCP servers behind API gateways, identity-aware proxies (IAP), or AI Gateways, recommended by the [MCP Security Best Practices](https://modelcontextprotocol.org/docs/security#mcp-proxy).
+
+- **Pomerium**: Full MCP support, including OAuth/OIDC authentication, fine-grained access policies, not just for the server but also for at the tool level, and session management. You can run your MCP server with authentication disabled (`ENABLE_AUTH=false`) and let Pomerium handle all security. See: [Pomerium MCP Capabilities](https://docs.pomerium.com/docs/capabilities/mcp).
+
+Have a gateway suggestion? [Create an issue](https://github.com/nickytonline/mcp-typescript-template/issues) to help expand this list!
+
+When you need OAuth 2.1 authentication with token validation, it's just a few config lines away:
+
+### Quick Setup
+
+1. **Add to your `.env` file:**
+
+   ```bash
+   ENABLE_AUTH=true
+   OAUTH_ISSUER=https://your-provider.com
+   OAUTH_CLIENT_ID=your-client-id
+   OAUTH_CLIENT_SECRET=your-client-secret
+   OAUTH_REDIRECT_URI=http://localhost:3000/callback  # Optional, defaults to BASE_URL/callback
+   ```
+
+2. **Restart the server**
+   ```bash
+   npm run dev
+   ```
+
+Your MCP server now requires valid OAuth tokens for all API requests.
+
+### Use Cases
+
+**Authentication Disabled** (`ENABLE_AUTH=false` or omitted):
+
+- Public MCP servers
+- Gateway-protected deployments (Pomerium, nginx with auth, etc.)
+- Internal corporate networks with perimeter security
+
+**Authentication Enabled** (`ENABLE_AUTH=true`):
+
+- Direct OAuth 2.1 with token validation
+- Self-contained secure deployment
+- Production servers without gateway infrastructure
+
+### OAuth Provider Examples
+
+**Auth0:**
+
+```bash
+ENABLE_AUTH=true
+OAUTH_ISSUER=https://your-domain.auth0.com
+OAUTH_CLIENT_ID=your-auth0-client-id
+OAUTH_CLIENT_SECRET=your-auth0-client-secret
+OAUTH_AUDIENCE=your-api-identifier
+```
+
+**Okta:**
+
+```bash
+ENABLE_AUTH=true
+OAUTH_ISSUER=https://your-domain.okta.com
+OAUTH_CLIENT_ID=your-okta-client-id
+OAUTH_CLIENT_SECRET=your-okta-client-secret
+```
+
+**Google:**
+
+```bash
+ENABLE_AUTH=true
+OAUTH_ISSUER=https://accounts.google.com
+OAUTH_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+OAUTH_CLIENT_SECRET=your-google-client-secret
+```
+
+### Making Authenticated Requests
+
+```bash
+curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  http://localhost:3000/mcp
+```
+
+### OAuth 2.1 Endpoints (when enabled)
+
+The server automatically provides these endpoints:
+
+- `GET /.well-known/oauth-authorization-server` - OAuth server metadata
+- `GET /.well-known/oauth-protected-resource` - Resource server metadata
+- `GET /oauth/authorize` - Authorization endpoint (with PKCE)
+- `POST /oauth/token` - Token exchange endpoint
+
+### Removing Authentication
+
+To completely remove OAuth support:
+
+1. Delete the `src/auth/` directory
+2. Remove auth imports from `src/index.ts`
+3. Remove OAuth environment variables from `src/config.ts`
+
+The core MCP server functionality is completely independent of the authentication layer.
 
 ## Why Express?
 
