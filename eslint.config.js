@@ -1,7 +1,11 @@
 import typescriptEslint from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
+import globals from 'globals';
 
 export default [
+  {
+    ignores: ['dist/**', 'node_modules/**', '*.config.js', 'coverage/**'],
+  },
   {
     files: ['**/*.ts'],
     languageOptions: {
@@ -11,18 +15,14 @@ export default [
         sourceType: 'module',
       },
       globals: {
-        console: 'readonly',
-        process: 'readonly',
-        Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-        global: 'readonly',
+        ...globals.node,
       },
     },
     plugins: {
       '@typescript-eslint': typescriptEslint,
     },
     rules: {
+      ...typescriptEslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
