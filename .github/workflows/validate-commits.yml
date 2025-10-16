@@ -8,7 +8,7 @@ jobs:
   validate-commits:
     runs-on: ubuntu-latest
     # Skip validation for Dependabot PRs since they follow their own commit format
-    if: github.actor != 'dependabot[bot]'
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
 
     steps:
       - name: Checkout code
