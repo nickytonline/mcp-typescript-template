@@ -15,11 +15,13 @@ This template provides:
 
 ## Getting Started
 
-1. **Clone or use this template**
+The easiest way to get started is using `degit`:
+
+1. **Create a new project from this template**
 
    ```bash
-   git clone <your-repo-url>
-   cd mcp-typescript-template
+   npx degit nickytonline/mcp-typescript-template my-mcp-server
+   cd my-mcp-server
    ```
 
 2. **Install dependencies**
@@ -40,6 +42,16 @@ This template provides:
    ```
 
 The server will be available at `http://localhost:3000` for MCP connections.
+
+### Alternative: Using GitHub Template
+
+You can also click the "Use this template" button on GitHub to create a new repository, then clone it:
+
+```bash
+git clone <your-repo-url>
+cd my-mcp-server
+npm install
+```
 
 ## Development
 
@@ -82,6 +94,22 @@ npm run format
 ```bash
 npm run format:check
 ```
+
+## Testing Your MCP Server
+
+You can test your MCP server using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+This will launch a web interface that allows you to:
+- Connect to your MCP server
+- Test your tools interactively
+- View request/response messages
+- Debug your MCP implementation
+
+Make sure your server is running (using `npm start` or `npm run dev`) before connecting with the inspector.
 
 ## Available Tools
 
