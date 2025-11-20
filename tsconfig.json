@@ -8,13 +8,14 @@
     "esModuleInterop": true,
     "allowJs": true,
     "strict": true,
-    "noEmit": true,
+    "outDir": "dist",
+    "rootDir": ".",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "lib": ["ES2022"],
     "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*", "api/**/*"],
+  "exclude": ["node_modules", "dist", ".vercel"]
 }
