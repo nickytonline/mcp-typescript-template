@@ -275,9 +275,9 @@ describe("sampling", () => {
         role: "assistant",
         content: { type: "image", url: "https://example.com/image.jpg" },
         stopReason: "endTurn",
-      };
+      } as unknown as Awaited<ReturnType<typeof mockServer.createMessage>>;
 
-      vi.mocked(mockServer.createMessage).mockResolvedValueOnce(mockResponse as any);
+      vi.mocked(mockServer.createMessage).mockResolvedValueOnce(mockResponse);
 
       const context = createSamplingContext(mockServer);
 
