@@ -6,6 +6,14 @@ const configSchema = z.object({
   SERVER_NAME: z.string().default("mcp-typescript-template"),
   SERVER_VERSION: z.string().default("1.0.0"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
+
+  // Sampling configuration
+  SAMPLING_ENABLED: z.coerce.boolean().default(true),
+  SAMPLING_TIMEOUT_MS: z.coerce.number().min(1000).max(300000).default(30000),
+  SAMPLING_MAX_TOKENS_DEFAULT: z.coerce.number().min(1).max(10000).default(1000),
+  SAMPLING_TEMPERATURE_DEFAULT: z.coerce.number().min(0).max(1).default(0.5),
+  SAMPLING_LOG_REQUESTS: z.coerce.boolean().default(true),
+  SAMPLING_LOG_USAGE: z.coerce.boolean().default(true),
 });
 
 export type Config = z.infer<typeof configSchema>;
