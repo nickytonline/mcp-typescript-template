@@ -143,3 +143,4 @@ vite.config.ts.timestamp-*
 
 # Claude Code local settings
 .claude/
+docs/ISSUE-MCP-SAMPLING.md
