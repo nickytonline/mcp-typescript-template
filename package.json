@@ -45,7 +45,7 @@
     "vitest": "^4.0.14"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.22.0",
+    "@modelcontextprotocol/sdk": "^1.24.3",
     "@types/express": "^5.0.5",
     "express": "^5.2.1",
     "pino": "^10.1.0",
