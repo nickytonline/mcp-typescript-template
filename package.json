@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@types/express": "^5.0.5",
+    "@types/express": "^5.0.6",
     "express": "^5.2.1",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2"
