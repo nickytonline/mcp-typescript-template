@@ -1,22 +1,10 @@
 import pino from "pino";
-import { getConfig, isDevelopment } from "./config.ts";
+import { getConfig } from "./config.ts";
 
 const config = getConfig();
 
 export const logger = pino({
   level: config.LOG_LEVEL,
-
-  // Pretty print in development, structured JSON in production
-  transport: isDevelopment()
-    ? {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "HH:MM:ss Z",
-          ignore: "pid,hostname",
-        },
-      }
-    : undefined,
 
   // Base fields for all log entries
   base: {
