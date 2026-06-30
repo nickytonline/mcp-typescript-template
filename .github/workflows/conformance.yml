@@ -1,0 +1,28 @@
+name: Conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start MCP server
+        run: docker compose up -d --wait
+
+      - name: Run MCP conformance tests
+        uses: modelcontextprotocol/conformance@v0.1.11
+        with:
+          mode: server
+          url: http://localhost:3000/mcp
+          suite: active
+          expected-failures: ./conformance-baseline.yml
