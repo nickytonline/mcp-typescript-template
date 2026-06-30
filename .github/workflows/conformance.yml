@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start MCP server
-        run: docker compose up -d --wait
+        run: docker compose up -d --wait --wait-timeout 60
 
       - name: Run MCP conformance tests
         uses: modelcontextprotocol/conformance@v0.1.11
