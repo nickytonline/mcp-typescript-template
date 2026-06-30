@@ -41,7 +41,7 @@ export default defineConfig(({ command }) => ({
         format: "es",
       },
     },
-    target: "node22",
+    target: "node24",
     outDir: "dist",
     emptyOutDir: true,
     ssr: true,
