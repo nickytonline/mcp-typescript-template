@@ -50,6 +50,10 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (sessionId) => {
           transports[sessionId] = transport;
+          transport.onclose = () => {
+            delete transports[sessionId];
+            logger.info("MCP session closed", { sessionId });
+          };
           logger.info("MCP session initialized", { sessionId });
         },
       });
@@ -75,6 +79,13 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
       res
         .status(400)
         .json({ error: "Session ID required for non-initialization requests" });
+      return;
+    }
+
+    // DELETE without a session ID is malformed
+    if (req.method === "DELETE" && !sessionId) {
+      logger.warn("DELETE request without session ID");
+      res.status(400).json({ error: "Session ID required to terminate a session" });
       return;
     }
 
@@ -106,6 +117,7 @@ const mcpHandler = async (req: express.Request, res: express.Response) => {
 // Handle MCP requests on /mcp endpoint
 app.post("/mcp", mcpHandler);
 app.get("/mcp", mcpHandler);
+app.delete("/mcp", mcpHandler);
 
 async function main() {
   const config = getConfig();
