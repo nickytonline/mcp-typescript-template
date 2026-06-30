@@ -156,9 +156,15 @@ The baseline currently skips entries in these categories:
 - **Tool response content types** — `tools-call-image`, `tools-call-audio`, `tools-call-embedded-resource`, `tools-call-mixed-content`, `tools-call-with-logging`, `tools-call-with-progress`, `tools-call-sampling`
 - **Resources** — `resources-list`, `resources-read-text`, `resources-read-binary`, `resources-templates-read`, `resources-subscribe`, `resources-unsubscribe`
 - **Prompts** — `prompts-list`, `prompts-get-simple`, `prompts-get-with-args`, `prompts-get-embedded-resource`, `prompts-get-with-image`
-- **Other** — `logging-set-level`, `completion-complete`, `tools-call-elicitation`, `elicitation-sep1034-defaults`, `elicitation-sep1330-enums`, `dns-rebinding-protection`
+- **Other** — `completion-complete`, `tools-call-elicitation`, `elicitation-sep1034-defaults`, `elicitation-sep1330-enums`, `dns-rebinding-protection`
 
 Check `conformance-baseline.yml` for the current full list — it may have been updated since this skill was written. Remove only the entries that your implementation actually satisfies.
+
+> **Important:** If you have already started the container at least once, you must force-recreate it after rebuilding — otherwise the old image is reused and the test will appear to fail even though the implementation is correct:
+>
+> ```bash
+> docker compose up -d --force-recreate --wait --wait-timeout 60
+> ```
 
 ---
 

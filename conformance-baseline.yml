@@ -2,9 +2,6 @@
 # Remove an entry when you implement that feature; stale entries cause CI to fail.
 # See README.md for details and a link to the full scenario list.
 server:
-  # Remove when you implement logging level control
-  - logging-set-level
-
   # Remove when you implement argument autocompletion
   - completion-complete
 
