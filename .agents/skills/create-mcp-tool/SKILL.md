@@ -167,6 +167,7 @@ Check `conformance-baseline.yml` for the current full list — it may have been 
 ```bash
 npm run build        # compile TypeScript
 npm run lint         # ESLint
+npm run format:check # Prettier formatting check
 npm run test         # Vitest unit tests
 npm run dev          # start server with hot reload for manual testing
 ```
