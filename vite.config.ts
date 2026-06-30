@@ -10,7 +10,7 @@ export default defineConfig(({ command }) => ({
       fileName: "index",
       formats: ["es"],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         "@modelcontextprotocol/sdk",
         "@modelcontextprotocol/sdk/server/mcp.js",
