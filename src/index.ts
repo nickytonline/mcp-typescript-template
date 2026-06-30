@@ -10,10 +10,17 @@ import { getConfig } from "./config.ts";
 
 const getServer = () => {
   const config = getConfig();
-  const server = new McpServer({
-    name: config.SERVER_NAME,
-    version: config.SERVER_VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: config.SERVER_NAME,
+      version: config.SERVER_VERSION,
+    },
+    {
+      capabilities: {
+        logging: {},
+      },
+    },
+  );
 
   server.registerTool(
     "echo",
@@ -25,6 +32,22 @@ const getServer = () => {
       },
     },
     async (args) => {
+      // Example: send an MCP log notification to the client. The client
+      // controls which levels it receives via logging/setLevel.
+      // See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
+      try {
+        await server.sendLoggingMessage({
+          level: "debug",
+          data: { message: args.message },
+          logger: "echo",
+        });
+      } catch (error) {
+        // Log notification failures must not prevent the tool from responding.
+        logger.debug("Failed to send MCP log notification", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       const data = { echo: args.message };
       return createTextResult(data);
     },
