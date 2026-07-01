@@ -111,25 +111,6 @@ This will launch a web interface that allows you to:
 
 Make sure your server is running (using `npm start` or `npm run dev`) before connecting with the inspector.
 
-## MCP Conformance Testing
-
-The CI pipeline runs [MCP conformance tests](https://github.com/modelcontextprotocol/conformance) against the built Docker image to verify spec compliance.
-
-The template only runs conformance tests for what it implements. The `conformance-baseline.yml` file lists scenarios that are expected to fail because the template doesn't implement those features (resources, prompts, advanced tool content types, etc.).
-
-**As you build out your server, update the baseline:**
-
-- Remove an entry from `conformance-baseline.yml` when you implement that feature — conformance will now enforce it in CI
-- See the [full list of server scenarios](https://github.com/modelcontextprotocol/conformance?tab=readme-ov-file#available-scenarios) for what each test covers
-- Leaving a stale entry after a feature is implemented causes CI to fail, keeping the baseline accurate
-
-To run conformance tests locally:
-
-```bash
-docker compose up -d --wait
-npx --yes @modelcontextprotocol/conformance@0.1.11 server --url http://localhost:3000/mcp --suite active --expected-failures ./conformance-baseline.yml
-```
-
 ## Available Tools
 
 The template includes one example tool:
