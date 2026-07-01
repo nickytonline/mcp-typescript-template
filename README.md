@@ -11,7 +11,7 @@ This template provides:
 - **Express** - Fast, unopinionated web framework for HTTP server
 - **ESLint + Prettier** - Code quality and formatting
 - **Docker** - Containerization support
-- **Example Tool** - Simple echo tool to demonstrate MCP tool implementation
+- **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
 
 ## Getting Started
 
@@ -113,7 +113,7 @@ Make sure your server is running (using `npm start` or `npm run dev`) before con
 
 ## Available Tools
 
-The template includes one example tool:
+The template includes two example tools:
 
 ### echo
 
@@ -123,10 +123,16 @@ Echoes back the provided message - a simple example to demonstrate MCP tool impl
 
 - `message` (string) - The message to echo back
 
+### elicit_echo
+
+Demonstrates [MCP elicitation](https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation): the tool takes no input, asks the connected client to prompt the user for a message, then echoes it back. Handles all three elicitation outcomes (accept, decline, cancel) and errors when the client doesn't support elicitation.
+
+Both tools declare an `outputSchema` and return `structuredContent` alongside the text result, and carry `annotations` (`readOnlyHint`, `idempotentHint`, `openWorldHint`) describing their safety profile.
+
 ## Customizing Your MCP Server
 
 1. **Update package.json** - Change name, description, and keywords
-2. **Modify src/index.ts** - Replace the echo tool with your custom tools
+2. **Modify src/tools.ts** - Replace the `echo` / `elicit_echo` tools with your custom tools
 3. **Add your logic** - Create additional TypeScript files for your business logic
 4. **Update README** - Document your specific MCP server functionality
 
@@ -159,14 +165,20 @@ docker compose up --build
 ```
 mcp-typescript-template/
 ├── src/
-│   └── index.ts          # Main MCP server entry point
+│   ├── index.ts          # HTTP routing + session lifecycle
+│   ├── tools.ts          # Tool registration (registerTools) and logic
+│   ├── tools.test.ts     # Integration tests (in-memory client/server)
+│   ├── config.ts         # Env var validation (Zod)
+│   ├── logger.ts         # Pino structured logging
+│   └── lib/
+│       ├── utils.ts      # MCP response helpers
+│       └── utils.test.ts # Unit tests
 ├── dist/                 # Built output (generated)
-├── .eslintrc.js         # ESLint configuration
-├── .prettierrc          # Prettier configuration
-├── tsconfig.json        # TypeScript configuration
-├── vite.config.ts       # Vite build configuration
-├── Dockerfile           # Docker configuration
-└── package.json         # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+├── vite.config.ts        # Vite build configuration
+├── eslint.config.js      # ESLint configuration
+├── Dockerfile            # Docker configuration
+└── package.json          # Dependencies and scripts
 ```
 
 ## Architecture
@@ -174,14 +186,17 @@ mcp-typescript-template/
 This template follows a simple architecture:
 
 - **HTTP Transport** - Uses Express with StreamableHTTPServerTransport for remote MCP connections
-- **Tool Registration** - Tools are registered with JSON schemas for input validation
-- **Error Handling** - Proper MCP-formatted error responses
+- **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
+- **Typed I/O** - Zod `inputSchema` for validation, plus `outputSchema` + `structuredContent` for typed results
+- **Error Handling** - Genuine failures return `isError: true` via `createErrorResult`; results are never thrown
 - **Session Management** - Handles MCP session initialization and management
 
 ## Example: Adding a New Tool
 
+Add the registration inside `registerTools()` in `src/tools.ts`. See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough.
+
 ```typescript
-import { createTextResult } from "./lib/utils.js";
+import { createErrorResult, createTextResult } from "./lib/utils.ts";
 
 server.registerTool(
   "my_tool",
@@ -192,12 +207,20 @@ server.registerTool(
       param1: z.string().describe("Description of param1"),
       param2: z.number().optional().describe("Optional parameter"),
     },
+    outputSchema: {
+      output: z.string().describe("Description of the result"),
+    },
+    annotations: { readOnlyHint: true, openWorldHint: false },
   },
   async (args) => {
-    // Your tool logic here
-    const result = await myCustomLogic(args.param1, args.param2);
-
-    return createTextResult(result);
+    try {
+      const result = await myCustomLogic(args.param1, args.param2);
+      return createTextResult(result);
+    } catch (error) {
+      return createErrorResult({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   },
 );
 ```

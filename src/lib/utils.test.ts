@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createTextResult } from "./utils.ts";
+import { createErrorResult, createTextResult } from "./utils.ts";
 
 describe("createTextResult", () => {
   // Mock data for testing
@@ -48,6 +48,33 @@ describe("createTextResult", () => {
     expect(item.type).toBe("text");
     if (item.type === "text") {
       expect(item.text).toBe("null");
+    }
+  });
+
+  it("should attach structuredContent for object payloads", () => {
+    const result = createTextResult(mockData);
+    expect(result.structuredContent).toEqual(mockData);
+  });
+
+  it("should not attach structuredContent for non-object payloads", () => {
+    expect(createTextResult(null).structuredContent).toBeUndefined();
+    expect(createTextResult("plain string").structuredContent).toBeUndefined();
+  });
+
+  it("should not flag success results as errors", () => {
+    expect(createTextResult(mockData).isError).toBeFalsy();
+  });
+});
+
+describe("createErrorResult", () => {
+  it("flags the result as an error while keeping the text/structured payload", () => {
+    const result = createErrorResult({ error: "boom" });
+    const item = result.content[0];
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({ error: "boom" });
+    if (item.type === "text") {
+      expect(item.text).toContain('"error": "boom"');
     }
   });
 });

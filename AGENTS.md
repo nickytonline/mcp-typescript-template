@@ -37,11 +37,13 @@ npm run lint && npm run format:check && npm run build && npm run test:ci
 
 ```
 src/
-  index.ts       # MCP server entry point — tool registration, HTTP routing
+  index.ts       # HTTP routing, session lifecycle; calls registerTools() in getServer()
+  tools.ts       # registerTools() wiring + per-tool logic functions
+  tools.test.ts  # colocated integration tests (in-memory client/server)
   config.ts      # Env var validation via Zod
   logger.ts      # Pino structured logging (OpenTelemetry compatible)
   lib/
-    utils.ts       # MCP response helpers
+    utils.ts       # MCP response helpers (createTextResult, createErrorResult)
     utils.test.ts  # colocated unit tests
 dist/            # compiled output (ES modules)
 ```
@@ -51,9 +53,9 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 ## Architecture
 
 - HTTP transport via Express on `PORT` (default 3000) — **not** stdio
-- Tools registered with `server.registerTool()` in `src/index.ts`
-- All tool responses use MCP `content` format: `[{ type: 'text', text: JSON.stringify(data) }]`
-- Errors returned as MCP-formatted messages, not thrown
+- Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/index.ts` and reused by the tests
+- Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
+- Genuine execution failures return `isError: true` (via `createErrorResult`), not thrown; valid outcomes (e.g. a user declining an elicitation) are normal results
 - Session lifecycle managed via `StreamableHTTPServerTransport`
 - Graceful shutdown on `SIGTERM`/`SIGINT`
 
@@ -99,12 +101,15 @@ Log levels: `error` > `warn` > `info` > `debug`. Include relevant IDs (session, 
 
 ## Adding a New Tool
 
-1. Call `server.registerTool()` in `src/index.ts`
-2. Provide a `title`, `description`, and Zod `inputSchema`
-3. Return `{ content: [{ type: 'text', text: JSON.stringify(result) }] }`
-4. Handle errors and return an error content response — don't throw
+See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough. In short:
+
+1. Add the `server.registerTool()` call inside `registerTools()` in `src/tools.ts`
+2. Provide a `title`, `description`, Zod `inputSchema`, an `outputSchema`, and `annotations` (e.g. `readOnlyHint`)
+3. Return `createTextResult(result)` on success (it also emits `structuredContent`)
+4. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
 5. Log with `logger.info({ toolName, args }, "Tool executed")` on success
 6. Log with `logger.error({ toolName, error: error.message }, "Tool execution failed")` on failure
+7. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
 
 ## Testing
 
@@ -120,7 +125,7 @@ To build your own MCP server from this template:
 
 1. Update `package.json` (name, description, version)
 2. Add/replace env vars in `src/config.ts`
-3. Replace the `echo` tool in `src/index.ts` with your tools
+3. Replace the `echo` / `elicit_echo` tools in `src/tools.ts` with your tools
 4. Add business logic under `src/`
 5. Update `README.md` and this `AGENTS.md` to reflect your project
 
