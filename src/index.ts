@@ -3,10 +3,9 @@ import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
-import { createTextResult } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
+import { registerTools } from "./tools.ts";
 
 const getServer = () => {
   const config = getConfig();
@@ -22,37 +21,7 @@ const getServer = () => {
     },
   );
 
-  server.registerTool(
-    "echo",
-    {
-      title: "Echo",
-      description: "Echo back the provided message",
-      inputSchema: {
-        message: z.string().describe("The message to echo back"),
-      },
-    },
-    async (args) => {
-      // Example: send an MCP log notification to the client. The client
-      // controls which levels it receives via logging/setLevel.
-      // See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
-      try {
-        await server.sendLoggingMessage({
-          level: "debug",
-          data: { message: args.message },
-          logger: "echo",
-        });
-      } catch (error) {
-        // Log notification failures must not prevent the tool from responding.
-        logger.debug(
-          { error: error instanceof Error ? error.message : String(error) },
-          "Failed to send MCP log notification",
-        );
-      }
-
-      const data = { echo: args.message };
-      return createTextResult(data);
-    },
-  );
+  registerTools(server);
 
   return server;
 };
