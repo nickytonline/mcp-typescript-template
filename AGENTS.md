@@ -1,19 +1,131 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-Core server code lives in `src/`. `src/index.ts` hosts the MCP Express server, `src/config.ts` normalizes environment variables, `src/logger.ts` wires Pino logging, and `src/lib/` contains reusable helpers alongside colocated tests such as `utils.test.ts`. Build artifacts land in `dist/`; configuration files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile`) sit at the repository root.
+TypeScript template for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io) servers over HTTP.
 
-## Build, Test, and Development Commands
-Use `npm run dev` for a live TypeScript dev loop with native type stripping (enabled by default in Node.js 24+). `npm run build` compiles to ES modules via Vite, while `npm start` serves the compiled output from `dist/`. Run `npm run test` for the interactive Vitest runner or `npm run test:ci` to emit JSON results into `test-results.json`. Quality gates include `npm run lint`, `npm run lint:fix`, `npm run format`, and `npm run format:check`.
+## Key Commands
 
-## Coding Style & Naming Conventions
-TypeScript files use ES module syntax (`import/export`) and live under `src/`. Follow the default Prettier style (two-space indent, double quotes, trailing commas) enforced by the formatting scripts. ESLint runs with `@typescript-eslint`; unused variables must be prefixed with `_` if intentional, and `any` is discouraged. Prefer `camelCase` for functions and variables, `PascalCase` for types, and descriptive filenames like `logger.ts` or `utils.ts`.
+```bash
+# Development (hot reload via native Node.js type stripping)
+npm run dev
 
-## Testing Guidelines
-Vitest powers unit tests. Name specs `*.test.ts` and keep them beside the code under test to mirror the existing `src/lib/utils.test.ts` pattern. Cover new tools, transports, and configuration logic with focused tests that exercise observable behaviour. Failing tests should reproduce regressions before fixes; wrap asynchronous tests with `async/await` to keep stack traces actionable.
+# Build (Vite → ES modules in dist/)
+npm run build
 
-## Commit & Pull Request Guidelines
-Adopt Conventional Commits (`feat:`, `chore:`, `docs:`) as seen in the history to keep change logs readable. Each PR should summarize the user-facing impact, reference related issues, and list follow-up tasks if scope is deferred. Include testing evidence (`npm run test`, `npm run lint`) and call out new environment variables or configuration knobs so reviewers can verify runtime changes.
+# Production
+npm start
 
-## Configuration & Operational Notes
-Runtime configuration is sourced from environment variables parsed in `src/config.ts` (`PORT`, `SERVER_NAME`, `LOG_LEVEL`, etc.). Document defaults when introducing new flags and avoid hard-coding secrets. Pino logging is structured; keep contextual metadata small and redact user-provided content where necessary.
+# Lint & format
+npm run lint
+npm run lint:fix
+npm run format
+npm run format:check
+
+# Tests
+npm run test       # interactive Vitest
+npm run test:ci    # outputs test-results.json
+```
+
+## Before Submitting
+
+Always run these and fix any failures before opening a PR:
+
+```bash
+npm run lint && npm run format:check && npm run build && npm run test:ci
+```
+
+## Project Structure
+
+```
+src/
+  index.ts       # MCP server entry point — tool registration, HTTP routing
+  config.ts      # Env var validation via Zod
+  logger.ts      # Pino structured logging (OpenTelemetry compatible)
+  lib/
+    utils.ts       # MCP response helpers
+    utils.test.ts  # colocated unit tests
+dist/            # compiled output (ES modules)
+```
+
+Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile`) live at the repo root.
+
+## Architecture
+
+- HTTP transport via Express on `PORT` (default 3000) — **not** stdio
+- Tools registered with `server.registerTool()` in `src/index.ts`
+- All tool responses use MCP `content` format: `[{ type: 'text', text: JSON.stringify(data) }]`
+- Errors returned as MCP-formatted messages, not thrown
+- Session lifecycle managed via `StreamableHTTPServerTransport`
+- Graceful shutdown on `SIGTERM`/`SIGINT`
+
+### Build System
+
+- Vite bundles to ES modules; `@modelcontextprotocol/sdk` is external (not bundled)
+- `@` path alias maps to `src/`
+- Node.js 24+ required (native TypeScript type stripping used in dev)
+
+## Environment Variables
+
+Defined and validated in `src/config.ts`:
+
+| Variable         | Default                    | Description                          |
+|------------------|----------------------------|--------------------------------------|
+| `PORT`           | `3000`                     | HTTP server port                     |
+| `NODE_ENV`       | —                          | `development` / `production` / `test` |
+| `SERVER_NAME`    | `mcp-typescript-template`  | MCP server name                      |
+| `SERVER_VERSION` | `1.0.0`                    | MCP server version                   |
+| `LOG_LEVEL`      | `info`                     | `error` / `warn` / `info` / `debug`  |
+
+## Coding Conventions
+
+- TypeScript with ES module syntax (`import`/`export`)
+- Prettier defaults: 2-space indent, double quotes, trailing commas
+- ESLint with `@typescript-eslint` — `any` is discouraged (warn)
+- Private class methods use `#` prefix
+- Intentionally unused params/vars: prefix with `_`
+- `camelCase` for functions/variables, `PascalCase` for types
+- Descriptive filenames: `logger.ts`, `utils.ts`
+
+## Logging
+
+Use `logger` from `src/logger.ts` — **never `console.log`**.
+
+```ts
+// Structured data first, message second
+logger.info({ sessionId, toolName }, "Tool executed");
+logger.error({ error: error.message, toolName }, "Tool execution failed");
+```
+
+Log levels: `error` > `warn` > `info` > `debug`. Include relevant IDs (session, user, tool). Pino automatically correlates traces when OpenTelemetry is configured.
+
+## Adding a New Tool
+
+1. Call `server.registerTool()` in `src/index.ts`
+2. Provide a `title`, `description`, and Zod `inputSchema`
+3. Return `{ content: [{ type: 'text', text: JSON.stringify(result) }] }`
+4. Handle errors and return an error content response — don't throw
+5. Log with `logger.info({ toolName, args }, "Tool executed")` on success
+6. Log with `logger.error({ toolName, error: error.message }, "Tool execution failed")` on failure
+
+## Testing
+
+- Framework: Vitest
+- Test files: `*.test.ts`, colocated beside the source (see `src/lib/utils.test.ts`)
+- Cover new tools, transports, and config logic with focused tests
+- Use `async/await` for all async tests
+- Write a failing test that reproduces a bug before fixing it
+
+## Using This Template
+
+To build your own MCP server from this template:
+
+1. Update `package.json` (name, description, version)
+2. Add/replace env vars in `src/config.ts`
+3. Replace the `echo` tool in `src/index.ts` with your tools
+4. Add business logic under `src/`
+5. Update `README.md` and this `AGENTS.md` to reflect your project
+
+## Commit & PR Guidelines
+
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `docs:`
+- PR description: summarize user-facing impact, link issues, list any new env vars
+- Include verification evidence: `npm run lint`, `npm run test:ci`
