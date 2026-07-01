@@ -23,6 +23,61 @@ const getServer = () => {
   );
 
   server.registerTool(
+    "elicit_echo",
+    {
+      title: "Elicit Echo",
+      description:
+        "Ask the user what they want to echo back, then echoes it",
+    },
+    async (extra) => {
+      const toolName = "elicit_echo";
+      const { sessionId, requestId } = extra;
+      try {
+        const result = await server.server.elicitInput({
+          message: "What would you like to echo?",
+          requestedSchema: {
+            type: "object",
+            properties: {
+              message: {
+                type: "string",
+                title: "Message",
+                description: "The message to echo back",
+              },
+            },
+            required: ["message"],
+          },
+        });
+
+        if (result.action === "accept") {
+          if (!result.content) {
+            logger.warn({ toolName, sessionId, requestId }, "Accept response missing content");
+            return createTextResult({ error: "Accepted but no content was returned" });
+          }
+          const data = { echo: result.content.message };
+          logger.info({ toolName, sessionId, requestId }, "Tool executed");
+          return createTextResult(data);
+        }
+
+        if (result.action === "decline") {
+          logger.info({ toolName, sessionId, requestId, action: "decline" }, "User declined elicitation");
+          return createTextResult({ echo: null, reason: "User declined to provide a message" });
+        }
+
+        logger.info({ toolName, sessionId, requestId, action: "cancel" }, "User cancelled elicitation");
+        return createTextResult({ echo: null, reason: "Elicitation was cancelled" });
+      } catch (error) {
+        logger.error(
+          { toolName, sessionId, requestId, error: error instanceof Error ? error.message : String(error) },
+          "Tool execution failed",
+        );
+        return createTextResult({
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  server.registerTool(
     "echo",
     {
       title: "Echo",
@@ -31,7 +86,9 @@ const getServer = () => {
         message: z.string().describe("The message to echo back"),
       },
     },
-    async (args) => {
+    async (args, extra) => {
+      const toolName = "echo";
+      const { sessionId, requestId } = extra;
       // Example: send an MCP log notification to the client. The client
       // controls which levels it receives via logging/setLevel.
       // See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
@@ -50,6 +107,7 @@ const getServer = () => {
       }
 
       const data = { echo: args.message };
+      logger.info({ toolName, sessionId, requestId }, "Tool executed");
       return createTextResult(data);
     },
   );
