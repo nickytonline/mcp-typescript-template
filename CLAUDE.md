@@ -93,8 +93,8 @@ The following environment variables are supported (see `src/config.ts`):
 
 - Use appropriate log levels: `error`, `warn`, `info`, `debug`
 - Include relevant context in log messages (user IDs, session IDs, etc.)
-- Log structured data as the second parameter: `logger.info("message", { key: value })`
-- Error logs should include error details: `logger.error("Error message", { error: error.message })`
+- Log structured data as the first parameter, message second: `logger.info({ key: value }, "message")`
+- Error logs should include error details: `logger.error({ error: error.message }, "Error message")`
 - The logger automatically includes trace correlation when OpenTelemetry is configured
 - Use the `logger` from `src/logger.ts` instead of `console.log`
 
@@ -107,5 +107,5 @@ When adding new tools to the MCP server:
 3. Define input schema using Zod for validation
 4. Return responses in MCP content format with JSON stringified data
 5. Handle errors gracefully and return appropriate error messages
-6. Use structured logging to track tool usage: `logger.info("Tool executed", { toolName, args })`
-7. Log errors with context: `logger.error("Tool execution failed", { toolName, error: error.message })`
+6. Use structured logging to track tool usage: `logger.info({ toolName, args }, "Tool executed")`
+7. Log errors with context: `logger.error({ toolName, error: error.message }, "Tool execution failed")`

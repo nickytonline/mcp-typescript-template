@@ -26,8 +26,8 @@ This is a TypeScript template for building Model Context Protocol (MCP) servers 
 ### Logging
 - **Always use structured logging**: Import and use `logger` from `src/logger.ts`
 - **Never use `console.log`** - use appropriate log levels instead
-- **Include context**: `logger.info("message", { key: value })`
-- **Error logging**: `logger.error("Error message", { error: error.message })`
+- **Include context**: `logger.info({ key: value }, "message")`
+- **Error logging**: `logger.error({ error: error.message }, "Error message")`
 
 ### Configuration
 - **Environment variables**: Add new config to `src/config.ts` with Zod validation
@@ -90,18 +90,18 @@ server.registerTool(
     },
   },
   async (args) => {
-    logger.info("Tool executed", { toolName: "tool_name", args });
-    
+    logger.info({ toolName: "tool_name", args }, "Tool executed");
+
     try {
       // Tool logic here
       const result = await doSomething(args.param1, args.param2);
-      
+
       return createTextResult(result);
     } catch (error) {
-      logger.error("Tool execution failed", { 
-        toolName: "tool_name", 
-        error: error instanceof Error ? error.message : error 
-      });
+      logger.error(
+        { toolName: "tool_name", error: error instanceof Error ? error.message : String(error) },
+        "Tool execution failed",
+      );
       throw error;
     }
   }
@@ -114,12 +114,12 @@ server.registerTool(
 try {
   // Code that might throw
   const result = await riskyOperation();
-  logger.info("Operation succeeded", { result });
+  logger.info({ result }, "Operation succeeded");
 } catch (error) {
-  logger.error("Operation failed", { 
-    error: error instanceof Error ? error.message : error,
-    context: "additional context"
-  });
+  logger.error(
+    { error: error instanceof Error ? error.message : String(error), context: "additional context" },
+    "Operation failed",
+  );
   // Handle error appropriately
 }
 ```

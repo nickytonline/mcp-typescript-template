@@ -49,7 +49,7 @@ server.registerTool(
     },
   },
   async (args) => {
-    logger.info("Tool invoked", { toolName: "my_tool", args });
+    logger.info({ toolName: "my_tool", args }, "Tool invoked");
 
     // Your tool logic here
     const result = {
@@ -103,16 +103,16 @@ Return errors in MCP format rather than throwing:
 
 ```typescript
 async (args) => {
-  logger.info("Tool invoked", { toolName: "my_tool", args });
+  logger.info({ toolName: "my_tool", args }, "Tool invoked");
 
   try {
     const result = await doSomething(args.query);
     return createTextResult(result);
   } catch (error) {
-    logger.error("Tool execution failed", {
-      toolName: "my_tool",
-      error: error instanceof Error ? error.message : error,
-    });
+    logger.error(
+      { toolName: "my_tool", error: error instanceof Error ? error.message : String(error) },
+      "Tool execution failed",
+    );
     return {
       content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : "Unknown error"}` }],
       isError: true,

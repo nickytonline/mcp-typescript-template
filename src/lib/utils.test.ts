@@ -10,32 +10,44 @@ describe("createTextResult", () => {
 
   it("should create a CallToolResult with correct structure", () => {
     const result = createTextResult(mockData);
+    const item = result.content[0];
 
     expect(result).toHaveProperty("content");
     expect(result.content).toHaveLength(1);
-    expect(result.content[0]).toHaveProperty("type", "text");
-    expect(result.content[0]).toHaveProperty("text");
-    expect(typeof result.content[0].text).toBe("string");
+    expect(item).toHaveProperty("type", "text");
+    expect(item).toHaveProperty("text");
+    if (item.type === "text") {
+      expect(typeof item.text).toBe("string");
+    }
   });
 
   it("should handle mock data correctly", () => {
     const result = createTextResult(mockData);
+    const item = result.content[0];
 
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toContain('"echo": "Hello world"');
+    expect(item.type).toBe("text");
+    if (item.type === "text") {
+      expect(item.text).toContain('"echo": "Hello world"');
+    }
   });
 
   it("should handle null data", () => {
     const result = createTextResult(null);
+    const item = result.content[0];
 
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toBe("null");
+    expect(item.type).toBe("text");
+    if (item.type === "text") {
+      expect(item.text).toBe("null");
+    }
   });
 
   it("should handle undefined data gracefully by converting to null", () => {
     const result = createTextResult(undefined);
+    const item = result.content[0];
 
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toBe("null");
+    expect(item.type).toBe("text");
+    if (item.type === "text") {
+      expect(item.text).toBe("null");
+    }
   });
 });
