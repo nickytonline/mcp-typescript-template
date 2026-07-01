@@ -5,11 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "npm run typecheck",
     "build": "vite build",
     "dev": "node --watch src/index.ts | pino-pretty",
     "start": "node dist/index.js",
     "test": "vitest",
     "test:ci": "vitest run --reporter=json --outputFile=test-results.json",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/**/*.ts",
