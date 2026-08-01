@@ -1,8 +1,6 @@
 import express from "express";
-import { randomUUID } from "node:crypto";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
 import { registerTools } from "./tools.ts";
@@ -26,105 +24,58 @@ const getServer = () => {
   return server;
 };
 
+// createMcpHandler runs the factory fresh per request (2026-07-28 spec: no
+// initialize/initialized handshake, no Mcp-Session-Id). It also answers
+// 2025-era stateful clients automatically via a stateless per-request
+// fallback, so no dual-transport wiring is needed for a transition period.
+const handler = createMcpHandler(getServer, {
+  onerror: (error) => {
+    logger.error({ error: error.message }, "Error handling MCP request");
+  },
+});
+
+const nodeHandler = toNodeHandler(handler, {
+  onerror: (error) => {
+    logger.error({ error: error.message }, "Error adapting MCP request for Node");
+  },
+});
+
 const app = express();
 app.use(express.json());
 
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+// There's no session to key a health check off anymore, so /mcp itself no
+// longer doubles as one (GET on it now goes through the MCP handler, not a
+// plain info response). Use a dedicated endpoint instead.
+app.get("/health", (_req, res) => {
+  const config = getConfig();
+  res.json({
+    name: config.SERVER_NAME,
+    version: config.SERVER_VERSION,
+    description: "TypeScript template for building MCP servers",
+    capabilities: ["tools"],
+  });
+});
 
-const mcpHandler = async (req: express.Request, res: express.Response) => {
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
-  try {
-    // Handle initialization requests (usually POST without session ID)
-    if (req.method === "POST" && !sessionId && isInitializeRequest(req.body)) {
-      logger.info("Initializing new MCP session");
-
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (sessionId) => {
-          transports[sessionId] = transport;
-          transport.onclose = () => {
-            delete transports[sessionId];
-            logger.info({ sessionId }, "MCP session closed");
-          };
-          logger.info({ sessionId }, "MCP session initialized");
-        },
-      });
-
-      const server = getServer();
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-      return;
-    }
-
-    // Handle existing session requests
-    if (sessionId && transports[sessionId]) {
-      const transport = transports[sessionId];
-      await transport.handleRequest(req, res, req.body);
-      return;
-    }
-
-    // Handle case where no session ID is provided for non-init requests
-    if (req.method === "POST" && !sessionId) {
-      logger.warn(
-        "POST request without session ID for non-initialization request",
-      );
-      res
-        .status(400)
-        .json({ error: "Session ID required for non-initialization requests" });
-      return;
-    }
-
-    // DELETE without a session ID is malformed
-    if (req.method === "DELETE" && !sessionId) {
-      logger.warn("DELETE request without session ID");
-      res.status(400).json({ error: "Session ID required to terminate a session" });
-      return;
-    }
-
-    // Handle unknown session
-    if (sessionId && !transports[sessionId]) {
-      logger.warn({ sessionId }, "Request for unknown session");
-      res.status(404).json({ error: "Session not found" });
-      return;
-    }
-
-    // For GET requests without session, return server info
-    if (req.method === "GET") {
-      const config = getConfig();
-      res.json({
-        name: config.SERVER_NAME,
-        version: config.SERVER_VERSION,
-        description: "TypeScript template for building MCP servers",
-        capabilities: ["tools"],
-      });
-    }
-  } catch (error) {
+app.all("/mcp", (req, res) => {
+  nodeHandler(req, res, req.body).catch((error) => {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
-      "Error handling MCP request",
+      "Unhandled error serving MCP request",
     );
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-// Handle MCP requests on /mcp endpoint
-app.post("/mcp", mcpHandler);
-app.get("/mcp", mcpHandler);
-app.delete("/mcp", mcpHandler);
+  });
+});
 
 async function main() {
   const config = getConfig();
 
-  // Graceful shutdown handling
   process.on("SIGTERM", () => {
     logger.info("SIGTERM received, shutting down gracefully");
-    process.exit(0);
+    void handler.close().finally(() => process.exit(0));
   });
 
   process.on("SIGINT", () => {
     logger.info("SIGINT received, shutting down gracefully");
-    process.exit(0);
+    void handler.close().finally(() => process.exit(0));
   });
 
   app.listen(config.PORT, () => {

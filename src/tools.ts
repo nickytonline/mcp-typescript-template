@@ -1,19 +1,22 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult, ElicitRequestFormParams, ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { McpServer, CallToolResult, InputRequiredResult, ServerContext } from "@modelcontextprotocol/server";
+import { inputRequired, inputResponse } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { createErrorResult, createTextResult } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 
-type ElicitInputFn = (params: ElicitRequestFormParams) => Promise<ElicitResult>;
 type SendLoggingMessageFn = (params: {
   level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency";
   data: unknown;
   logger?: string;
 }) => Promise<void>;
 
+const ELICIT_ECHO_MESSAGE_KEY = "message";
+
 /**
  * Registers all MCP tools on the server.
- * Called once per session from getServer() in src/index.ts.
+ * Called once per request from getServer() in src/index.ts (the 2026-07-28
+ * spec serves each request from a fresh instance — there is no per-connection
+ * session to register tools once for).
  */
 export function registerTools(server: McpServer): void {
   server.registerTool(
@@ -25,10 +28,10 @@ export function registerTools(server: McpServer): void {
       // (see createTextResult). The echo may be null when the user declines or
       // cancels, so `echo` is nullable and not required.
       // https://modelcontextprotocol.io/specification/2025-06-18/server/tools#output-schema
-      outputSchema: {
+      outputSchema: z.object({
         echo: z.string().nullable().describe("The echoed message, or null if none was provided"),
         reason: z.string().optional().describe("Why no message was echoed, when applicable"),
-      },
+      }),
       // Annotations are untrusted hints clients use for UX/safety. This tool
       // neither mutates state nor touches the outside world.
       // https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool
@@ -38,7 +41,7 @@ export function registerTools(server: McpServer): void {
         openWorldHint: false,
       },
     },
-    (extra) => elicitEcho(server.server.elicitInput.bind(server.server), extra),
+    (ctx) => elicitEcho(ctx),
   );
 
   server.registerTool(
@@ -50,85 +53,88 @@ export function registerTools(server: McpServer): void {
       // JSON Schema and validates incoming args for us. (Contrast with the
       // elicitation `requestedSchema` in elicitEcho, which must be hand-written
       // JSON Schema; see the comment there.)
-      inputSchema: {
+      inputSchema: z.object({
         message: z.string().describe("The message to echo back"),
-      },
-      outputSchema: {
+      }),
+      outputSchema: z.object({
         echo: z.string().describe("The echoed message"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
     },
-    (args, extra) => echo(server.sendLoggingMessage.bind(server), args, extra),
+    (args, ctx) => echo(server.sendLoggingMessage.bind(server), args, ctx),
   );
 }
 
 /**
- * Asks the user what they want to echo via MCP elicitation, then echoes it back.
- * Handles all three elicitation outcomes: accept, decline, and cancel.
+ * Asks the user what they want to echo via MCP elicitation, then echoes it
+ * back. This is a multi-round-trip tool (protocol revision 2026-07-28): the
+ * first call has no `inputResponses` yet, so it returns an `inputRequired()`
+ * result carrying the embedded elicitation request. The client resolves that
+ * and retries the same tool call with the response attached — this handler
+ * runs again and reads it via `ctx.mcpReq.inputResponses` to produce the
+ * final result. (The older push-style `elicitInput()` call throws on a
+ * 2026-07-28-era request, which is why this can't be a single synchronous
+ * await like it was under the previous stateful spec.)
  */
-async function elicitEcho(
-  elicitInput: ElicitInputFn,
-  extra: { sessionId?: string; requestId: unknown },
-): Promise<CallToolResult> {
+function elicitEcho(ctx: ServerContext): CallToolResult | InputRequiredResult {
   const toolName = "elicit_echo";
-  const { sessionId, requestId } = extra;
-  try {
-    // Elicitation `requestedSchema` must be a hand-written, flat JSON Schema
-    // (the restricted subset the MCP spec allows: primitive properties only,
-    // no nesting). This is why we don't reuse a Zod schema here the way `echo`
-    // does for its inputSchema — elicitation intentionally accepts only this
-    // limited shape so clients can render a simple form.
-    // https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation#request-schema
-    const result = await elicitInput({
-      message: "What would you like to echo?",
-      requestedSchema: {
-        type: "object",
-        properties: {
-          message: {
-            type: "string",
-            title: "Message",
-            description: "The message to echo back",
+  const requestId = ctx.mcpReq.id;
+  const response = inputResponse(ctx.mcpReq.inputResponses, ELICIT_ECHO_MESSAGE_KEY);
+
+  if (response.kind === "missing") {
+    return inputRequired({
+      inputRequests: {
+        [ELICIT_ECHO_MESSAGE_KEY]: inputRequired.elicit({
+          message: "What would you like to echo?",
+          // Elicitation `requestedSchema` must be a hand-written, flat JSON
+          // Schema (the restricted subset the MCP spec allows: primitive
+          // properties only, no nesting).
+          // https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation#request-schema
+          requestedSchema: {
+            type: "object",
+            properties: {
+              message: {
+                type: "string",
+                title: "Message",
+                description: "The message to echo back",
+              },
+            },
+            required: ["message"],
           },
-        },
-        required: ["message"],
+        }),
       },
     });
-
-    if (result.action === "accept") {
-      if (!result.content) {
-        logger.warn({ toolName, sessionId, requestId }, "Accept response missing content");
-        // A genuine failure: the client claimed acceptance but sent nothing.
-        return createErrorResult({ error: "Accepted but no content was returned" });
-      }
-      const data = { echo: result.content.message };
-      logger.info({ toolName, sessionId, requestId }, "Tool executed");
-      return createTextResult(data);
-    }
-
-    // Decline and cancel are valid user outcomes, not errors — return them as
-    // normal results (no isError) so the model treats them as a real answer.
-    if (result.action === "decline") {
-      logger.info({ toolName, sessionId, requestId, action: "decline" }, "User declined elicitation");
-      return createTextResult({ echo: null, reason: "User declined to provide a message" });
-    }
-
-    logger.info({ toolName, sessionId, requestId, action: "cancel" }, "User cancelled elicitation");
-    return createTextResult({ echo: null, reason: "Elicitation was cancelled" });
-  } catch (error) {
-    // Reaching here means elicitation itself failed (e.g. the client doesn't
-    // support it) — a genuine execution error.
-    logger.error(
-      { toolName, sessionId, requestId, error: error instanceof Error ? error.message : String(error) },
-      "Tool execution failed",
-    );
-    return createErrorResult({
-      error: error instanceof Error ? error.message : String(error),
-    });
   }
+
+  // Decline and cancel are valid user outcomes, not errors — return them as
+  // normal results (no isError) so the model treats them as a real answer.
+  if (response.kind !== "elicit") {
+    logger.error({ toolName, requestId, kind: response.kind }, "Tool execution failed");
+    return createErrorResult({ error: "Expected an elicitation response" });
+  }
+
+  if (response.action === "decline") {
+    logger.info({ toolName, requestId, action: "decline" }, "User declined elicitation");
+    return createTextResult({ echo: null, reason: "User declined to provide a message" });
+  }
+
+  if (response.action === "cancel") {
+    logger.info({ toolName, requestId, action: "cancel" }, "User cancelled elicitation");
+    return createTextResult({ echo: null, reason: "Elicitation was cancelled" });
+  }
+
+  const accepted = z.object({ message: z.string() }).safeParse(response.content);
+  if (!accepted.success) {
+    logger.warn({ toolName, requestId }, "Accept response missing content");
+    return createErrorResult({ error: "Accepted but no content was returned" });
+  }
+
+  logger.info({ toolName, requestId }, "Tool executed");
+  return createTextResult({ echo: accepted.data.message });
 }
 
 /**
@@ -138,10 +144,10 @@ async function elicitEcho(
 async function echo(
   sendLoggingMessage: SendLoggingMessageFn,
   args: { message: string },
-  extra: { sessionId?: string; requestId: unknown },
+  ctx: ServerContext,
 ): Promise<CallToolResult> {
   const toolName = "echo";
-  const { sessionId, requestId } = extra;
+  const requestId = ctx.mcpReq.id;
   // Example: send an MCP log notification to the client. The client
   // controls which levels it receives via logging/setLevel.
   // See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
@@ -160,6 +166,6 @@ async function echo(
   }
 
   const data = { echo: args.message };
-  logger.info({ toolName, sessionId, requestId }, "Tool executed");
+  logger.info({ toolName, requestId }, "Tool executed");
   return createTextResult(data);
 }

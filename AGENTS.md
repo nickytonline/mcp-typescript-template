@@ -37,7 +37,7 @@ npm run lint && npm run format:check && npm run build && npm run test:ci
 
 ```
 src/
-  index.ts       # HTTP routing, session lifecycle; calls registerTools() in getServer()
+  index.ts       # HTTP routing via createMcpHandler + toNodeHandler (stateless, per-request); calls registerTools() in getServer()
   tools.ts       # registerTools() wiring + per-tool logic functions
   tools.test.ts  # colocated integration tests (in-memory client/server)
   config.ts      # Env var validation via Zod
@@ -56,12 +56,14 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 - Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/index.ts` and reused by the tests
 - Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
 - Genuine execution failures return `isError: true` (via `createErrorResult`), not thrown; valid outcomes (e.g. a user declining an elicitation) are normal results
-- Session lifecycle managed via `StreamableHTTPServerTransport`
-- Graceful shutdown on `SIGTERM`/`SIGINT`
+- Stateless per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no `Mcp-Session-Id` — `createMcpHandler`'s factory runs `getServer()` fresh for every HTTP request. It also serves older (2025-era) clients automatically via a stateless fallback, so no separate legacy transport is needed.
+- `GET /health` is a plain liveness endpoint (used by the Docker healthcheck) — `GET /mcp` itself is routed to the MCP handler and no longer doubles as one
+- If a tool needs state across calls, mint an explicit handle and have the model pass it back as an argument on the next call — there is no transport-level session to hang state off anymore
+- Graceful shutdown on `SIGTERM`/`SIGINT` (closes the handler, then exits)
 
 ### Build System
 
-- Vite bundles to ES modules; `@modelcontextprotocol/sdk` is external (not bundled)
+- Vite bundles to ES modules; `@modelcontextprotocol/server` and `@modelcontextprotocol/node` are external (not bundled)
 - `@` path alias maps to `src/`
 - Node.js 24+ required (native TypeScript type stripping used in dev)
 
@@ -93,23 +95,25 @@ Use `logger` from `src/logger.ts` — **never `console.log`**.
 
 ```ts
 // Structured data first, message second
-logger.info({ sessionId, toolName }, "Tool executed");
+logger.info({ requestId, toolName }, "Tool executed");
 logger.error({ error: error.message, toolName }, "Tool execution failed");
 ```
 
-Log levels: `error` > `warn` > `info` > `debug`. Include relevant IDs (session, user, tool). Pino automatically correlates traces when OpenTelemetry is configured.
+Log levels: `error` > `warn` > `info` > `debug`. Include relevant IDs (request, user, tool). Pino automatically correlates traces when OpenTelemetry is configured.
 
 ## Adding a New Tool
 
 See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough. In short:
 
 1. Add the `server.registerTool()` call inside `registerTools()` in `src/tools.ts`
-2. Provide a `title`, `description`, Zod `inputSchema`, an `outputSchema`, and `annotations` (e.g. `readOnlyHint`)
-3. Return `createTextResult(result)` on success (it also emits `structuredContent`)
-4. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
-5. Log with `logger.info({ toolName, args }, "Tool executed")` on success
-6. Log with `logger.error({ toolName, error: error.message }, "Tool execution failed")` on failure
-7. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
+2. Provide a `title`, `description`, `inputSchema`/`outputSchema` wrapped in `z.object({...})` (the raw-shape `{ field: z.string() }` form is deprecated), and `annotations` (e.g. `readOnlyHint`)
+3. The handler receives `(args, ctx)` (or just `(ctx)` with no `inputSchema`) — `ctx.mcpReq.id` is the request id; there is no `sessionId` to rely on
+4. Return `createTextResult(result)` on success (it also emits `structuredContent`)
+5. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
+6. Log with `logger.info({ toolName, args }, "Tool executed")` on success
+7. Log with `logger.error({ toolName, error: error.message }, "Tool execution failed")` on failure
+8. If the tool needs user input mid-call, return `inputRequired({ inputRequests: {...} })` (see `elicit_echo` in `src/tools.ts`) — the older synchronous `elicitInput()` push request throws on a 2026-07-28-era connection
+9. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
 
 ## Testing
 

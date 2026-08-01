@@ -1,13 +1,13 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import {
-  CallToolResultSchema,
-  ElicitRequestSchema,
-  LoggingMessageNotificationSchema,
+  McpServer,
+  InMemoryTransport,
+  createMcpHandler,
+  type CallToolResult,
+  type ElicitRequest,
   type ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@modelcontextprotocol/server";
 import { registerTools } from "./tools.ts";
 
 type TestHarness = {
@@ -36,7 +36,16 @@ afterEach(async () => {
 
 /**
  * Wires up an in-memory client/server pair for integration testing, exercising
- * the full MCP protocol stack in-process. A single helper covers every case:
+ * the full MCP protocol stack in-process. A bare `Protocol.connect()` (no HTTP
+ * layer) negotiates the legacy 2025 handshake by default, so this harness
+ * exercises `elicit_echo` over that era. Its handler code (`inputRequired()` /
+ * `ctx.mcpReq.inputResponses`) is era-agnostic — the SDK translates the same
+ * calls into whichever wire representation the connection negotiated — so
+ * this is still a real test of the tool logic; see the "modern era" describe
+ * block below for an end-to-end test of the 2026-07-28 multi-round-trip wire
+ * path through the actual `createMcpHandler` production entry point.
+ *
+ * A single helper covers every case:
  *   - pass an `elicitHandler` to answer elicitation requests
  *   - set `supportsElicitation: false` to test the unsupported-client path
  *   - pass `onLog` to capture outbound logging notifications
@@ -58,15 +67,17 @@ async function setupClientServer(options: SetupOptions = {}) {
   );
 
   if (elicitHandler) {
-    client.setRequestHandler(ElicitRequestSchema, async (request) => {
+    client.setRequestHandler("elicitation/create", async (request: ElicitRequest) => {
       return elicitHandler({ message: request.params.message });
     });
   }
 
   if (onLog) {
-    client.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
-      onLog(notification.params);
-    });
+    client.fallbackNotificationHandler = async (notification) => {
+      if (notification.method === "notifications/message") {
+        onLog(notification.params as { level: string; data: unknown; logger?: string });
+      }
+    };
   }
 
   await server.connect(serverTransport);
@@ -76,15 +87,10 @@ async function setupClientServer(options: SetupOptions = {}) {
   return harness;
 }
 
-function parseContent(result: unknown): Record<string, unknown> {
-  const parsed = CallToolResultSchema.safeParse(result);
-  expect(parsed.success).toBe(true);
-  if (!parsed.success) {
-    throw new Error("callTool result did not match CallToolResult schema");
-  }
-  const item = parsed.data.content[0];
-  expect(item.type).toBe("text");
-  if (item.type !== "text") {
+function parseContent(result: CallToolResult): Record<string, unknown> {
+  const item = result.content[0];
+  expect(item?.type).toBe("text");
+  if (item?.type !== "text") {
     throw new Error("expected text content");
   }
   return JSON.parse(item.text);
@@ -197,8 +203,81 @@ describe("elicit_echo tool", () => {
       arguments: {},
     });
 
-    const parsed = parseContent(result);
-    expect(parsed.error).toMatch(/elicitation/i);
+    // The SDK itself rejects the embedded elicitation request before our
+    // handler's inputResponse() ever sees a retry — it never reaches our own
+    // createErrorResult, so the message here is SDK-formatted, not ours.
+    const item = result.content[0];
+    expect(item?.type).toBe("text");
+    if (item?.type === "text") {
+      expect(item.text).toMatch(/elicitation/i);
+    }
     expect(result.isError).toBe(true);
+  });
+});
+
+describe("elicit_echo tool (2026-07-28 modern era)", () => {
+  /**
+   * The in-memory harness above negotiates the legacy 2025 handshake by
+   * default. These tests instead go through `createMcpHandler` — the actual
+   * production entry point wired up in src/index.ts — via a
+   * `StreamableHTTPClientTransport` whose `fetch` is bridged directly to the
+   * handler in-process (no real network), with the client pinned to the
+   * 2026-07-28 era. This confirms the multi-round-trip
+   * (`inputRequired`/`inputResponses`) path actually works end-to-end on the
+   * wire format this migration introduces, not just against the tool
+   * function in isolation.
+   */
+  async function setupModernEraClient(options: { supportsElicitation?: boolean } = {}) {
+    const { supportsElicitation = true } = options;
+
+    const server = new McpServer(
+      { name: "test-server", version: "0.0.0" },
+      { capabilities: { logging: {} } },
+    );
+    registerTools(server);
+
+    const handler = createMcpHandler(() => server);
+    const transport = new StreamableHTTPClientTransport(new URL("http://localhost/mcp"), {
+      fetch: async (input, init) => handler.fetch(new Request(input, init)),
+    });
+
+    const client = new Client(
+      { name: "test-client", version: "0.0.0" },
+      {
+        capabilities: supportsElicitation ? { elicitation: {} } : {},
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+      },
+    );
+
+    await client.connect(transport);
+    expect(client.getProtocolEra()).toBe("modern");
+
+    return { client, handler };
+  }
+
+  it("echoes the message the user provides via elicitation", async () => {
+    const { client, handler } = await setupModernEraClient();
+    client.setRequestHandler("elicitation/create", async () => ({
+      action: "accept",
+      content: { message: "modern era hello" },
+    }));
+
+    const result = await client.callTool({ name: "elicit_echo", arguments: {} });
+
+    const parsed = parseContent(result);
+    expect(parsed.echo).toBe("modern era hello");
+    expect(result.isError).toBeFalsy();
+
+    await client.close();
+    await handler.close();
+  });
+
+  it("returns an error result when the client does not support elicitation", async () => {
+    const { client, handler } = await setupModernEraClient({ supportsElicitation: false });
+
+    await expect(client.callTool({ name: "elicit_echo", arguments: {} })).rejects.toThrow(/elicitation/i);
+
+    await client.close();
+    await handler.close();
   });
 });
