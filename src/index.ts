@@ -62,6 +62,15 @@ app.all("/mcp", (req, res) => {
       { error: error instanceof Error ? error.message : String(error) },
       "Unhandled error serving MCP request",
     );
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      });
+    } else {
+      res.end();
+    }
   });
 });
 
