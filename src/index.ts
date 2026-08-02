@@ -43,17 +43,8 @@ const nodeHandler = toNodeHandler(handler, {
 const app = express();
 app.use(express.json());
 
-// There's no session to key a health check off anymore, so /mcp itself no
-// longer doubles as one (GET on it now goes through the MCP handler, not a
-// plain info response). Use a dedicated endpoint instead.
 app.get("/health", (_req, res) => {
-  const config = getConfig();
-  res.json({
-    name: config.SERVER_NAME,
-    version: config.SERVER_VERSION,
-    description: "TypeScript template for building MCP servers",
-    capabilities: ["tools"],
-  });
+  res.json({ status: "ok" });
 });
 
 app.all("/mcp", (req, res) => {
