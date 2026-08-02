@@ -197,6 +197,7 @@ This template follows a simple architecture:
 Add the registration inside `registerTools()` in `src/tools.ts`. See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough.
 
 ```typescript
+import { z } from "zod";
 import { createErrorResult, createTextResult } from "./lib/utils.ts";
 
 server.registerTool(
