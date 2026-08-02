@@ -36,7 +36,10 @@ const handler = createMcpHandler(getServer, {
 
 const nodeHandler = toNodeHandler(handler, {
   onerror: (error) => {
-    logger.error({ error: error.message }, "Error adapting MCP request for Node");
+    logger.error(
+      { error: error.message },
+      "Error adapting MCP request for Node",
+    );
   },
 });
 
