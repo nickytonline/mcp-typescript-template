@@ -189,7 +189,7 @@ This template follows a simple architecture:
 - **Stateless** - Per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no session ID — `getServer()` runs fresh for every HTTP request. Older (2025-era) clients are still served automatically via a built-in stateless fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
 - **Typed I/O** - Zod `inputSchema`/`outputSchema` (wrapped in `z.object()`) for validation, plus `structuredContent` for typed results
-- **Error Handling** - Genuine failures return `isError: true` via `createErrorResult`; results are never thrown
+- **Error Handling** - Genuine tool execution failures return `isError: true` via `createErrorResult` rather than being thrown; protocol, transport, and capability failures (e.g. an unsupported elicitation) can still reject the client call
 - **Health Check** - `GET /health` is a plain liveness endpoint (used by the Docker health check); `GET /mcp` is routed to the MCP handler itself
 
 ## Example: Adding a New Tool
