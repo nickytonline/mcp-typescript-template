@@ -96,10 +96,10 @@ Use `logger` from `src/logger.ts` — **never `console.log`**.
 ```ts
 // Structured data first, message second
 logger.info({ requestId, toolName }, "Tool executed");
-logger.error({ error: error.message, toolName }, "Tool execution failed");
+logger.error({ requestId, toolName, error: error.message }, "Tool execution failed");
 ```
 
-Log levels: `error` > `warn` > `info` > `debug`. Include relevant IDs (request, user, tool). Pino automatically correlates traces when OpenTelemetry is configured.
+Log levels: `error` > `warn` > `info` > `debug`. Include `requestId` and `toolName` on every entry so log lines can be correlated back to a single call; add other scalar fields relevant to the outcome (e.g. `action`, `kind`). Never log the raw `args` object — tool inputs may carry user-provided or sensitive data — log individual fields only when they're known to be safe to record. Pino automatically correlates traces when OpenTelemetry is configured.
 
 ## Adding a New Tool
 
@@ -110,8 +110,8 @@ See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full 
 3. The handler receives `(args, ctx)` (or just `(ctx)` with no `inputSchema`) — `ctx.mcpReq.id` is the request id; there is no `sessionId` to rely on
 4. Return `createTextResult(result)` on success (it also emits `structuredContent`)
 5. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
-6. Log with `logger.info({ toolName, args }, "Tool executed")` on success
-7. Log with `logger.error({ toolName, error: error.message }, "Tool execution failed")` on failure
+6. Log with `logger.info({ toolName, requestId }, "Tool executed")` on success
+7. Log with `logger.error({ toolName, requestId, error: error.message }, "Tool execution failed")` on failure — omit the raw `args` object (see Logging)
 8. If the tool needs user input mid-call, return `inputRequired({ inputRequests: {...} })` (see `elicit_echo` in `src/tools.ts`) — the older synchronous `elicitInput()` push request throws on a 2026-07-28-era connection
 9. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
 

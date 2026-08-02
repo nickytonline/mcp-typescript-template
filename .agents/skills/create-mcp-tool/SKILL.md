@@ -81,7 +81,8 @@ Key points:
 - `inputSchema` / `outputSchema` must be a `z.object({...})` — the bare `{ field: z.string() }` shorthand is deprecated
 - Return `createTextResult(data)` on success — it emits both a text block and `structuredContent` for `outputSchema`-aware clients ([structured content](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content))
 - Keep the tool's logic in a function that receives only the dependencies it needs (e.g. `sendLoggingMessage`, `ctx`); pass them from the registration callback with `.bind()` where needed. This keeps each tool small and testable
-- Log tool execution with `logger.info` and failures with `logger.error`, including `requestId` (`ctx.mcpReq.id`) for traceability — there's no `sessionId` under the stateless spec
+- Log tool execution with `logger.info` and failures with `logger.error`, always including `toolName` and `requestId` (`ctx.mcpReq.id`) for correlation — there's no `sessionId` under the stateless spec
+- Never log the raw `args` object — tool inputs may carry user-provided or sensitive data. Log individual fields only when they're known to be safe (see `action`/`kind` in `elicitEcho`'s error/decline/cancel logs in `src/tools.ts`)
 
 ### Tool Annotations
 
