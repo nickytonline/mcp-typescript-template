@@ -165,7 +165,7 @@ docker compose up --build
 ```
 mcp-typescript-template/
 ├── src/
-│   ├── index.ts          # HTTP routing + session lifecycle
+│   ├── index.ts          # HTTP routing via createMcpHandler (stateless, per-request)
 │   ├── tools.ts          # Tool registration (registerTools) and logic
 │   ├── tools.test.ts     # Integration tests (in-memory client/server)
 │   ├── config.ts         # Env var validation (Zod)
@@ -185,17 +185,19 @@ mcp-typescript-template/
 
 This template follows a simple architecture:
 
-- **HTTP Transport** - Uses Express with StreamableHTTPServerTransport for remote MCP connections
+- **HTTP Transport** - Uses Express with `createMcpHandler` (`@modelcontextprotocol/server`) for remote MCP connections
+- **Stateless** - Per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no session ID — `getServer()` runs fresh for every HTTP request. Older (2025-era) clients are still served automatically via a built-in stateless fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
-- **Typed I/O** - Zod `inputSchema` for validation, plus `outputSchema` + `structuredContent` for typed results
-- **Error Handling** - Genuine failures return `isError: true` via `createErrorResult`; results are never thrown
-- **Session Management** - Handles MCP session initialization and management
+- **Typed I/O** - Zod `inputSchema`/`outputSchema` (wrapped in `z.object()`) for validation, plus `structuredContent` for typed results
+- **Error Handling** - Genuine tool execution failures return `isError: true` via `createErrorResult` rather than being thrown; protocol, transport, and capability failures (e.g. an unsupported elicitation) can still reject the client call
+- **Health Check** - `GET /health` is a plain liveness endpoint (used by the Docker health check); `GET /mcp` is routed to the MCP handler itself
 
 ## Example: Adding a New Tool
 
 Add the registration inside `registerTools()` in `src/tools.ts`. See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough.
 
 ```typescript
+import { z } from "zod";
 import { createErrorResult, createTextResult } from "./lib/utils.ts";
 
 server.registerTool(
@@ -203,13 +205,13 @@ server.registerTool(
   {
     title: "My Custom Tool",
     description: "Description of what this tool does",
-    inputSchema: {
+    inputSchema: z.object({
       param1: z.string().describe("Description of param1"),
       param2: z.number().optional().describe("Optional parameter"),
-    },
-    outputSchema: {
+    }),
+    outputSchema: z.object({
       output: z.string().describe("Description of the result"),
-    },
+    }),
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
   async (args) => {
@@ -229,7 +231,7 @@ server.registerTool(
 
 This template uses Express for the HTTP server, which provides:
 
-- **MCP SDK Compatibility** - Full compatibility with the MCP TypeScript SDK's StreamableHTTPServerTransport
+- **MCP SDK Compatibility** - Full compatibility with `@modelcontextprotocol/server`'s `createMcpHandler`, adapted to Node/Express via `@modelcontextprotocol/node`'s `toNodeHandler`
 - **Mature & Stable** - Battle-tested HTTP server with extensive ecosystem
 - **TypeScript Support** - Excellent TypeScript support with comprehensive type definitions
 - **Middleware Ecosystem** - Rich ecosystem of middleware for common tasks

@@ -12,10 +12,8 @@ export default defineConfig(({ command }) => ({
     },
     rolldownOptions: {
       external: [
-        "@modelcontextprotocol/sdk",
-        "@modelcontextprotocol/sdk/server/mcp.js",
-        "@modelcontextprotocol/sdk/server/streamableHttp.js",
-        "@modelcontextprotocol/sdk/types.js",
+        "@modelcontextprotocol/server",
+        "@modelcontextprotocol/node",
         "express",
         "zod",
         "node:crypto",
@@ -52,6 +50,6 @@ export default defineConfig(({ command }) => ({
     },
   },
   ssr: {
-    external: ["@modelcontextprotocol/sdk", "express", "zod"],
+    external: ["@modelcontextprotocol/server", "@modelcontextprotocol/node", "express", "zod"],
   },
 }));

@@ -8,7 +8,7 @@ metadata:
 
 # Add an MCP Tool to This Template
 
-This skill walks you through adding a new tool to the MCP server. If you need to reference MCP SDK types, capabilities, or advanced patterns not covered here, use the context7 MCP server or WebFetch to look up the [`@modelcontextprotocol/sdk` documentation](https://github.com/modelcontextprotocol/typescript-sdk).
+This skill walks you through adding a new tool to the MCP server. If you need to reference MCP SDK types, capabilities, or advanced patterns not covered here, use the context7 MCP server or WebFetch to look up the [`@modelcontextprotocol/server` documentation](https://github.com/modelcontextprotocol/typescript-sdk).
 
 ---
 
@@ -23,7 +23,7 @@ This skill walks you through adding a new tool to the MCP server. If you need to
 | Typed output | `outputSchema` + `structuredContent` (emitted automatically by `createTextResult`) |
 | Tests | `src/tools.test.ts` (colocated with `src/tools.ts`) |
 
-Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/index.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is a function that takes only the dependencies it needs (e.g. the bound `elicitInput` function, `sendLoggingMessage`, and the `extra` object), which keeps it small and easy to drive through every branch. `index.ts` owns only HTTP routing and session lifecycle; each session gets its own isolated `McpServer` instance.
+Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/index.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is a function that takes only the dependencies it needs (e.g. the bound `sendLoggingMessage` function and the `ctx` object), which keeps it small and easy to drive through every branch. `index.ts` owns only HTTP routing via `createMcpHandler` — per the MCP 2026-07-28 spec there's no session: `getServer()` runs fresh for every request.
 
 ---
 
@@ -45,19 +45,19 @@ server.registerTool(
   {
     title: "My Tool",
     description: "A clear, specific description of what this tool does and when to use it",
-    inputSchema: {
+    inputSchema: z.object({
       query: z.string().describe("The input to process — be specific about format or constraints"),
       limit: z.number().int().min(1).max(100).optional().describe("Maximum number of results to return (default: 10)"),
-    },
+    }),
     // Declare the shape of a successful result so clients can consume
     // structuredContent (createTextResult emits it automatically).
-    outputSchema: {
+    outputSchema: z.object({
       output: z.string().describe("The processed output"),
       count: z.number().describe("Number of results"),
-    },
+    }),
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  (args, extra) => myTool(args, extra),
+  (args, ctx) => myTool(args, ctx),
 );
 ```
 
@@ -66,22 +66,23 @@ Then implement `myTool` as a function lower in the file:
 ```typescript
 async function myTool(
   args: { query: string; limit?: number },
-  extra: { sessionId?: string; requestId: unknown },
+  ctx: ServerContext,
 ): Promise<CallToolResult> {
   const toolName = "my_tool";
-  const { sessionId, requestId } = extra;
+  const requestId = ctx.mcpReq.id;
 
   const result = { output: args.query, count: 1 };
-  logger.info({ toolName, sessionId, requestId }, "Tool executed");
+  logger.info({ toolName, requestId }, "Tool executed");
   return createTextResult(result);
 }
 ```
 
 Key points:
-- `inputSchema` / `outputSchema` take an object of Zod field definitions (not a full `z.object()` — just the shape)
+- `inputSchema` / `outputSchema` must be a `z.object({...})` — the bare `{ field: z.string() }` shorthand is deprecated
 - Return `createTextResult(data)` on success — it emits both a text block and `structuredContent` for `outputSchema`-aware clients ([structured content](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content))
-- Keep the tool's logic in a function that receives only the dependencies it needs (e.g. `elicitInput`, `sendLoggingMessage`, `extra`); pass them from the registration callback with `.bind()` where needed. This keeps each tool small and testable
-- Log tool execution with `logger.info` and failures with `logger.error`, including `sessionId` and `requestId` from `extra` for traceability
+- Keep the tool's logic in a function that receives only the dependencies it needs (e.g. `sendLoggingMessage`, `ctx`); pass them from the registration callback with `.bind()` where needed. This keeps each tool small and testable
+- Log tool execution with `logger.info` and failures with `logger.error`, always including `toolName` and `requestId` (`ctx.mcpReq.id`) for correlation — there's no `sessionId` under the stateless spec
+- Never log the raw `args` object — tool inputs may carry user-provided or sensitive data. Log individual fields only when they're known to be safe (see `action`/`kind` in `elicitEcho`'s error/decline/cancel logs in `src/tools.ts`)
 
 ### Tool Annotations
 
@@ -117,17 +118,17 @@ server.registerTool(
 Report execution failures in-band with `createErrorResult` (which sets `isError: true`) rather than throwing — this lets the client/model distinguish a failure from a normal result. Reserve `isError` for genuine failures; valid outcomes (e.g. a user declining an elicitation, or an empty search) are normal results via `createTextResult`. See [Error Handling](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#error-handling) in the spec.
 
 ```typescript
-async function myTool(args, extra) {
+async function myTool(args, ctx) {
   const toolName = "my_tool";
-  const { sessionId, requestId } = extra;
+  const requestId = ctx.mcpReq.id;
 
   try {
     const result = await doSomething(args.query);
-    logger.info({ toolName, sessionId, requestId }, "Tool executed");
+    logger.info({ toolName, requestId }, "Tool executed");
     return createTextResult(result);
   } catch (error) {
     logger.error(
-      { toolName, sessionId, requestId, error: error instanceof Error ? error.message : String(error) },
+      { toolName, requestId, error: error instanceof Error ? error.message : String(error) },
       "Tool execution failed",
     );
     return createErrorResult({
@@ -136,6 +137,38 @@ async function myTool(args, extra) {
   }
 }
 ```
+
+### Needing user input mid-call
+
+If a tool must ask the user something before it can finish (the `elicit_echo` pattern), don't use the old synchronous `elicitInput()` push request — it throws on a 2026-07-28-era connection. Instead return an `inputRequired()` result and read the response back via `inputResponse()`/`ctx.mcpReq.inputResponses` on the retried call:
+
+```typescript
+import { inputRequired, inputResponse } from "@modelcontextprotocol/server";
+
+function myTool(ctx: ServerContext): CallToolResult | InputRequiredResult {
+  const response = inputResponse(ctx.mcpReq.inputResponses, "confirm");
+
+  if (response.kind === "missing") {
+    return inputRequired({
+      inputRequests: {
+        confirm: inputRequired.elicit({
+          message: "Proceed?",
+          requestedSchema: {
+            type: "object",
+            properties: { confirm: { type: "boolean" } },
+            required: ["confirm"],
+          },
+        }),
+      },
+    });
+  }
+
+  // response.kind === "elicit" here; handle response.action (accept/decline/cancel)
+  // ...
+}
+```
+
+The client resolves the embedded request and retries the same tool call with the response attached — this handler runs again, on a fresh request id, and sees it via `ctx.mcpReq.inputResponses`. See `elicitEcho` in `src/tools.ts` for a complete worked example, including decline/cancel handling.
 
 ---
 
@@ -147,10 +180,8 @@ Follow the existing pattern:
 
 ```typescript
 import { afterEach, describe, it, expect } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { McpServer, InMemoryTransport, type CallToolResult } from "@modelcontextprotocol/server";
 import { registerTools } from "./tools.ts";
 
 let harness: { client: Client; server: McpServer } | undefined;
@@ -183,15 +214,10 @@ async function setupClientServer() {
   return harness;
 }
 
-function parseContent(result: unknown): Record<string, unknown> {
-  const parsed = CallToolResultSchema.safeParse(result);
-  expect(parsed.success).toBe(true);
-  if (!parsed.success) {
-    throw new Error("callTool result did not match CallToolResult schema");
-  }
-  const item = parsed.data.content[0];
-  expect(item.type).toBe("text");
-  if (item.type !== "text") {
+function parseContent(result: CallToolResult): Record<string, unknown> {
+  const item = result.content[0];
+  expect(item?.type).toBe("text");
+  if (item?.type !== "text") {
     throw new Error("expected text content");
   }
   return JSON.parse(item.text);
@@ -217,7 +243,7 @@ Key points:
 - Connect the server before the client (`server.connect` then `client.connect`) so the initialize handshake completes
 - Use `afterEach` to close both sides leak-safely, even if assertions fail
 - The existing `setupClientServer` takes an options object — pass `elicitHandler` to answer elicitation, `supportsElicitation: false` to test the unsupported-client path, and `onLog` to capture outbound logging notifications. Reuse it rather than adding new helpers
-- Use `CallToolResultSchema.safeParse()` to validate and narrow the `callTool` return type before asserting on content
+- `client.callTool()` already returns a typed `CallToolResult` — no schema re-validation needed, just narrow `content[0].type === "text"` before parsing it
 - Assert `result.structuredContent` for `outputSchema`-aware output, and `result.isError` to confirm failures are flagged (and that valid outcomes are *not*)
 
 Run tests with:
