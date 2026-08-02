@@ -272,7 +272,7 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
     await handler.close();
   });
 
-  it("returns an error result when the client does not support elicitation", async () => {
+  it("rejects the tool call when the client does not support elicitation", async () => {
     const { client, handler } = await setupModernEraClient({ supportsElicitation: false });
 
     await expect(client.callTool({ name: "elicit_echo", arguments: {} })).rejects.toThrow(/elicitation/i);
