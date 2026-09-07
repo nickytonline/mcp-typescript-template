@@ -39,6 +39,17 @@ describe("toMcpSchema", () => {
     });
   });
 
+  it("generates output JSON Schema", () => {
+    const jsonSchema = schema["~standard"].jsonSchema.output({
+      target: "draft-07",
+    });
+
+    expect(jsonSchema).toMatchObject({
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+    });
+  });
+
   it("rejects unsupported JSON Schema targets", () => {
     expect(() =>
       schema["~standard"].jsonSchema.input({ target: "openapi-3.0" }),
