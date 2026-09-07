@@ -16,8 +16,8 @@ const configEffect = EffectConfig.all({
   ),
 });
 
-export type Config = typeof configEffect extends EffectConfig.Config<infer A>
-  ? A
+export type Config = typeof configEffect extends EffectConfig.Config<infer ConfigValue>
+  ? ConfigValue
   : never;
 
 const loadConfig = Effect.withConfigProvider(ConfigProvider.fromEnv())(configEffect);

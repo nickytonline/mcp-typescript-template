@@ -20,8 +20,8 @@ function toEffectJsonSchemaTarget(
   }
 }
 
-function makeMcpJsonSchema<A, I>(
-  schema: Schema.Schema<A, I>,
+function makeMcpJsonSchema<Output, Input>(
+  schema: Schema.Schema<Output, Input>,
   options: McpJsonSchemaOptions,
 ): Record<string, unknown> {
   return JSONSchema.make(schema, {
@@ -37,9 +37,9 @@ function makeMcpJsonSchema<A, I>(
  * needs the companion JSON Schema converter to advertise schemas over the
  * wire, so this adapter supplies that one additional capability.
  */
-export function toMcpSchema<A, I = A>(
-  schema: Schema.Schema<A, I>,
-): StandardSchemaWithJSON<I, A> {
+export function toMcpSchema<Output, Input = Output>(
+  schema: Schema.Schema<Output, Input>,
+): StandardSchemaWithJSON<Input, Output> {
   const standard = Schema.standardSchemaV1(schema);
 
   const adapted = {
@@ -51,7 +51,7 @@ export function toMcpSchema<A, I = A>(
         output: (options) => makeMcpJsonSchema(schema, options),
       },
     },
-  } satisfies StandardSchemaWithJSON<I, A>;
+  } satisfies StandardSchemaWithJSON<Input, Output>;
 
   return adapted;
 }
