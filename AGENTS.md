@@ -107,7 +107,7 @@ yield* logger.info({ requestId, toolName }, "Tool executed");
 yield* logger.error({ requestId, toolName, error: error.message }, "Tool execution failed");
 ```
 
-Log levels: `error` > `warn` > `info` > `debug`. Include `requestId` and `toolName` on every entry so log lines can be correlated back to a single call; add other scalar fields relevant to the outcome (e.g. `action`, `kind`). Never log the raw `args` object — tool inputs may carry user-provided or sensitive data — log individual fields only when they're known to be safe to record. Effect logging carries structured annotations and integrates with Effect's tracing context.
+Log levels: `error` > `warn` > `info` > `debug`. For tool-call logs, include `requestId` and `toolName` so entries can be correlated back to a single call. Lifecycle and shutdown logs should include the context available to them. Add other scalar fields relevant to the outcome (e.g. `action`, `kind`). Never log the raw `args` object — tool inputs may carry user-provided or sensitive data — log individual fields only when they're known to be safe to record. Effect logging carries structured annotations and integrates with Effect's tracing context.
 
 ## Adding a New Tool
 
