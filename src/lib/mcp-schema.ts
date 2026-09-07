@@ -33,7 +33,7 @@ export function toMcpSchema<A, I = A>(
 ): StandardSchemaWithJSON<I, A> {
   const standard = Schema.standardSchemaV1(schema);
 
-  return {
+  const adapted = {
     ...standard,
     "~standard": {
       ...standard["~standard"],
@@ -48,5 +48,7 @@ export function toMcpSchema<A, I = A>(
           }) as unknown as Record<string, unknown>,
       },
     },
-  } as StandardSchemaWithJSON<I, A>;
+  } satisfies StandardSchemaWithJSON<I, A>;
+
+  return adapted;
 }

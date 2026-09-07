@@ -6,12 +6,12 @@ const config = getConfig();
 type LogFields = Readonly<Record<string, unknown>>;
 type LogInput = LogFields | string;
 
-const minimumLevel: Record<ConfigLogLevel, LogLevel.LogLevel> = {
+const minimumLevel = {
   error: LogLevel.Error,
   warn: LogLevel.Warning,
   info: LogLevel.Info,
   debug: LogLevel.Debug,
-};
+} satisfies Record<ConfigLogLevel, LogLevel.LogLevel>;
 
 type ConfigLogLevel = "error" | "warn" | "info" | "debug";
 
