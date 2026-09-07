@@ -1,27 +1,43 @@
-import { z } from "zod";
+import { Config as EffectConfig, ConfigProvider, Effect } from "effect";
 
-const configSchema = z.object({
-  PORT: z.coerce.number().default(3000),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  SERVER_NAME: z.string().default("mcp-typescript-template"),
-  SERVER_VERSION: z.string().default("1.0.0"),
-  LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
+export type Config = {
+  readonly PORT: number;
+  readonly NODE_ENV: "development" | "production" | "test";
+  readonly SERVER_NAME: string;
+  readonly SERVER_VERSION: string;
+  readonly LOG_LEVEL: "error" | "warn" | "info" | "debug";
+};
+
+const configEffect = EffectConfig.all({
+  PORT: EffectConfig.number("PORT").pipe(EffectConfig.withDefault(3000)),
+  NODE_ENV: EffectConfig.literal("development", "production", "test")("NODE_ENV").pipe(
+    EffectConfig.withDefault("development"),
+  ),
+  SERVER_NAME: EffectConfig.string("SERVER_NAME").pipe(
+    EffectConfig.withDefault("mcp-typescript-template"),
+  ),
+  SERVER_VERSION: EffectConfig.string("SERVER_VERSION").pipe(
+    EffectConfig.withDefault("1.0.0"),
+  ),
+  LOG_LEVEL: EffectConfig.literal("error", "warn", "info", "debug")("LOG_LEVEL").pipe(
+    EffectConfig.withDefault("info"),
+  ),
 });
 
-export type Config = z.infer<typeof configSchema>;
+const loadConfig = Effect.withConfigProvider(ConfigProvider.fromEnv())(configEffect);
 
-let config: Config;
+let config: Config | undefined;
 
 export function getConfig(): Config {
   if (!config) {
     try {
-      config = configSchema.parse(process.env);
+      config = Effect.runSync(loadConfig);
     } catch (error) {
-      console.error("❌ Invalid environment configuration:", error);
+      process.stderr.write(`Invalid environment configuration: ${String(error)}\n`);
       process.exit(1);
     }
   }
-  return config;
+  return config as Config;
 }
 
 export function isProduction(): boolean {

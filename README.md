@@ -7,6 +7,7 @@ A TypeScript template for building remote Model Context Protocol (MCP) servers w
 This template provides:
 
 - **TypeScript 7** - Native compiler with strict configuration; TypeScript 6 remains available for `typescript-eslint`'s compiler API
+- **Effect** - Typed configuration, validation, logging, error handling, and async workflows
 - **Vite** - Fast build system with ES modules output
 - **Express** - Fast, unopinionated web framework for HTTP server
 - **ESLint + Prettier** - Code quality and formatting
@@ -172,11 +173,13 @@ mcp-typescript-template/
 │   ├── index.ts          # HTTP routing via createMcpHandler (stateless, per-request)
 │   ├── tools.ts          # Tool registration (registerTools) and logic
 │   ├── tools.test.ts     # Integration tests (in-memory client/server)
-│   ├── config.ts         # Env var validation (Zod)
-│   ├── logger.ts         # Pino structured logging
+│   ├── config.ts         # Env var loading and validation (Effect Config)
+│   ├── logger.ts         # Effect structured logging
 │   └── lib/
 │       ├── utils.ts      # MCP response helpers
-│       └── utils.test.ts # Unit tests
+│       ├── mcp-schema.ts  # Effect Schema → MCP Standard Schema adapter
+│       ├── utils.test.ts # Unit tests
+│       └── mcp-schema.test.ts # Schema adapter and dialect tests
 ├── dist/                 # Built output (generated)
 ├── tsconfig.json         # TypeScript configuration
 ├── vite.config.ts        # Vite build configuration
@@ -192,7 +195,8 @@ This template follows a simple architecture:
 - **HTTP Transport** - Uses Express with `createMcpHandler` (`@modelcontextprotocol/server`) for remote MCP connections
 - **Stateless** - Per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no session ID — `getServer()` runs fresh for every HTTP request. Older (2025-era) clients are still served automatically via a built-in stateless fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
-- **Typed I/O** - Zod `inputSchema`/`outputSchema` (wrapped in `z.object()`) for validation, plus `structuredContent` for typed results
+- **Typed I/O** - Effect Schema `inputSchema`/`outputSchema` values adapted to MCP Standard Schema, plus `structuredContent` for typed results
+- **JSON Schema Dialects** - The adapter supports both MCP-requested `draft-07` and `draft-2020-12` output
 - **Error Handling** - Genuine tool execution failures return `isError: true` via `createErrorResult` rather than being thrown; protocol, transport, and capability failures (e.g. an unsupported elicitation) can still reject the client call
 - **Health Check** - `GET /health` is a plain liveness endpoint (used by the Docker health check); `GET /mcp` is routed to the MCP handler itself
 
@@ -201,35 +205,37 @@ This template follows a simple architecture:
 Add the registration inside `registerTools()` in `src/tools.ts`. See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough.
 
 ```typescript
-import { z } from "zod";
-import { createErrorResult, createTextResult } from "./lib/utils.ts";
+import type { CallToolResult, ServerContext } from "@modelcontextprotocol/server";
+import { Effect, Schema } from "effect";
+import { toMcpSchema } from "./lib/mcp-schema.ts";
+import { createTextResult, runMcpEffect } from "./lib/utils.ts";
 
 server.registerTool(
   "my_tool",
   {
     title: "My Custom Tool",
     description: "Description of what this tool does",
-    inputSchema: z.object({
-      param1: z.string().describe("Description of param1"),
-      param2: z.number().optional().describe("Optional parameter"),
-    }),
-    outputSchema: z.object({
-      output: z.string().describe("Description of the result"),
-    }),
+    inputSchema: toMcpSchema(
+      Schema.Struct({
+        param1: Schema.String,
+        param2: Schema.optional(Schema.Number),
+      }),
+    ),
+    outputSchema: toMcpSchema(Schema.Struct({ output: Schema.String })),
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  async (args) => {
-    try {
-      const result = await myCustomLogic(args.param1, args.param2);
-      return createTextResult(result);
-    } catch (error) {
-      return createErrorResult({
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  },
+  (args, ctx) => runMcpEffect(myTool(args, ctx)),
 );
+
+function myTool(
+  args: { param1: string; param2?: number },
+  _ctx: ServerContext,
+): Effect.Effect<CallToolResult> {
+  return Effect.succeed(createTextResult({ output: args.param1 }));
+}
 ```
+
+Keep the tool workflow in `Effect` and use `runMcpEffect()` only where it crosses back into the MCP SDK callback API. For asynchronous work, use `Effect.tryPromise`; for independent parallel work, use `Effect.all` with explicit concurrency.
 
 ## Why Express?
 

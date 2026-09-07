@@ -40,11 +40,13 @@ src/
   index.ts       # HTTP routing via createMcpHandler + toNodeHandler (stateless, per-request); calls registerTools() in getServer()
   tools.ts       # registerTools() wiring + per-tool logic functions
   tools.test.ts  # colocated integration tests (in-memory client/server)
-  config.ts      # Env var validation via Zod
-  logger.ts      # Pino structured logging (OpenTelemetry compatible)
+  config.ts      # Env var loading and validation via Effect Config
+  logger.ts      # Effect structured logging
   lib/
     utils.ts       # MCP response helpers (createTextResult, createErrorResult)
+    mcp-schema.ts  # Effect Schema adapter for MCP Standard Schema
     utils.test.ts  # colocated unit tests
+    mcp-schema.test.ts # adapter and JSON Schema dialect tests
 dist/            # compiled output (ES modules)
 ```
 
@@ -55,11 +57,13 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 - HTTP transport via Express on `PORT` (default 3000) — **not** stdio
 - Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/index.ts` and reused by the tests
 - Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
+- Tool workflows use `Effect` and cross the MCP callback boundary with `runMcpEffect()`
+- Effect Schemas cross the MCP boundary through `toMcpSchema()`, which supports the MCP SDK's `draft-07` and `draft-2020-12` JSON Schema targets
 - Genuine execution failures return `isError: true` (via `createErrorResult`), not thrown; valid outcomes (e.g. a user declining an elicitation) are normal results
 - Stateless per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no `Mcp-Session-Id` — `createMcpHandler`'s factory runs `getServer()` fresh for every HTTP request. It also serves older (2025-era) clients automatically via a stateless fallback, so no separate legacy transport is needed.
 - `GET /health` is a plain liveness endpoint (used by the Docker healthcheck) — `GET /mcp` itself is routed to the MCP handler and no longer doubles as one
 - If a tool needs state across calls, mint an explicit handle and have the model pass it back as an argument on the next call — there is no transport-level session to hang state off anymore
-- Graceful shutdown on `SIGTERM`/`SIGINT` (closes the handler, then exits)
+- Graceful shutdown on `SIGTERM`/`SIGINT` (closes the handler and HTTP server in parallel with `Effect.all`, then exits)
 
 ### Build System
 
@@ -89,38 +93,40 @@ Defined and validated in `src/config.ts`:
 - Intentionally unused params/vars: prefix with `_`
 - `camelCase` for functions/variables, `PascalCase` for types
 - Descriptive filenames: `logger.ts`, `utils.ts`
+- Use `Effect.all` with explicit concurrency for independent parallel effects; use `Effect.tryPromise` only at Promise-based integration boundaries
 
 ## Logging
 
-Use `logger` from `src/logger.ts` — **never `console.log`**.
+Use `logger` from `src/logger.ts` — yield the returned Effect inside an Effect workflow or run it with `runMcpEffect()` at a callback boundary. Never use `console.log`.
 
 ```ts
 // Structured data first, message second
-logger.info({ requestId, toolName }, "Tool executed");
-logger.error({ requestId, toolName, error: error.message }, "Tool execution failed");
+yield* logger.info({ requestId, toolName }, "Tool executed");
+yield* logger.error({ requestId, toolName, error: error.message }, "Tool execution failed");
 ```
 
-Log levels: `error` > `warn` > `info` > `debug`. Include `requestId` and `toolName` on every entry so log lines can be correlated back to a single call; add other scalar fields relevant to the outcome (e.g. `action`, `kind`). Never log the raw `args` object — tool inputs may carry user-provided or sensitive data — log individual fields only when they're known to be safe to record. Pino automatically correlates traces when OpenTelemetry is configured.
+Log levels: `error` > `warn` > `info` > `debug`. Include `requestId` and `toolName` on every entry so log lines can be correlated back to a single call; add other scalar fields relevant to the outcome (e.g. `action`, `kind`). Never log the raw `args` object — tool inputs may carry user-provided or sensitive data — log individual fields only when they're known to be safe to record. Effect logging carries structured annotations and integrates with Effect's tracing context.
 
 ## Adding a New Tool
 
 See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough. In short:
 
 1. Add the `server.registerTool()` call inside `registerTools()` in `src/tools.ts`
-2. Provide a `title`, `description`, `inputSchema`/`outputSchema` wrapped in `z.object({...})` (the raw-shape `{ field: z.string() }` form is deprecated), and `annotations` (e.g. `readOnlyHint`)
+2. Provide a `title`, `description`, `inputSchema`/`outputSchema` created with `toMcpSchema(Schema.Struct({...}))`, and `annotations` (e.g. `readOnlyHint`)
 3. The handler receives `(args, ctx)` (or just `(ctx)` with no `inputSchema`) — `ctx.mcpReq.id` is the request id; there is no `sessionId` to rely on
-4. Return `createTextResult(result)` on success (it also emits `structuredContent`)
-5. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
-6. Log with `logger.info({ toolName, requestId }, "Tool executed")` on success
-7. Log with `logger.error({ toolName, requestId, error: error.message }, "Tool execution failed")` on failure — omit the raw `args` object (see Logging)
-8. If the tool needs user input mid-call, return `inputRequired({ inputRequests: {...} })` (see `elicit_echo` in `src/tools.ts`) — the older synchronous `elicitInput()` push request throws on a 2026-07-28-era connection
-9. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
+4. Compose the implementation as an `Effect` and return `runMcpEffect(effect)` from the MCP callback
+5. Return `createTextResult(result)` on success (it also emits `structuredContent`)
+6. On genuine failure return `createErrorResult({ error })` (sets `isError: true`); don't throw
+7. Log with `yield* logger.info({ toolName, requestId }, "Tool executed")` on success
+8. Log with `yield* logger.error({ toolName, requestId, error: error.message }, "Tool execution failed")` on failure — omit the raw `args` object (see Logging)
+9. If the tool needs user input mid-call, return `inputRequired({ inputRequests: {...} })` (see `elicit_echo` in `src/tools.ts`) — the older synchronous `elicitInput()` push request throws on a 2026-07-28-era connection
+10. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
 
 ## Testing
 
 - Framework: Vitest
 - Test files: `*.test.ts`, colocated beside the source (see `src/lib/utils.test.ts`)
-- Cover new tools, transports, and config logic with focused tests
+- Cover new tools, transports, config logic, and schema adapters with focused tests
 - Use `async/await` for all async tests
 - Write a failing test that reproduces a bug before fixing it
 
@@ -136,6 +142,6 @@ To build your own MCP server from this template:
 
 ## Commit & PR Guidelines
 
-- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `docs:`
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `docs:`; use `feat!:` for breaking template migrations
 - PR description: summarize user-facing impact, link issues, list any new env vars
 - Include verification evidence: `npm run lint`, `npm run test:ci`

@@ -97,6 +97,25 @@ function parseContent(result: CallToolResult): Record<string, unknown> {
 }
 
 describe("echo tool", () => {
+  it("advertises Effect schemas as MCP JSON Schema", async () => {
+    const { client } = await setupClientServer();
+
+    const result = await client.listTools();
+    const echoTool = result.tools.find((tool) => tool.name === "echo");
+
+    expect(echoTool).toBeDefined();
+    expect(echoTool?.inputSchema).toMatchObject({
+      type: "object",
+      properties: { message: { type: "string" } },
+      required: ["message"],
+    });
+    expect(echoTool?.outputSchema).toMatchObject({
+      type: "object",
+      properties: { echo: { type: "string" } },
+      required: ["echo"],
+    });
+  });
+
   it("echoes back the provided message", async () => {
     const { client } = await setupClientServer();
 
