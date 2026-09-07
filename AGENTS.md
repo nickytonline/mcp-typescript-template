@@ -109,7 +109,7 @@ Log levels: `error` > `warn` > `info` > `debug`. Include `requestId` and `toolNa
 
 ## Adding a New Tool
 
-See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough. In short:
+See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough. For projects created from the pre-Effect version of this template, use `migrate-mcp-template-to-effect` (`.agents/skills/migrate-mcp-template-to-effect`) first. In short:
 
 1. Add the `server.registerTool()` call inside `registerTools()` in `src/tools.ts`
 2. Provide a `title`, `description`, `inputSchema`/`outputSchema` created with `toMcpSchema(Schema.Struct({...}))`, and `annotations` (e.g. `readOnlyHint`)
