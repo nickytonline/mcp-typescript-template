@@ -20,6 +20,15 @@ function toEffectJsonSchemaTarget(
   }
 }
 
+function makeMcpJsonSchema<A, I>(
+  schema: Schema.Schema<A, I>,
+  options: McpJsonSchemaOptions,
+): Record<string, unknown> {
+  return JSONSchema.make(schema, {
+    target: toEffectJsonSchemaTarget(options.target),
+  }) as unknown as Record<string, unknown>;
+}
+
 /**
  * Adapts an Effect Schema to the Standard Schema + JSON Schema contract used
  * by the MCP SDK for tool input and output schemas.
@@ -38,14 +47,8 @@ export function toMcpSchema<A, I = A>(
     "~standard": {
       ...standard["~standard"],
       jsonSchema: {
-        input: (options) =>
-          JSONSchema.make(schema, {
-            target: toEffectJsonSchemaTarget(options.target),
-          }) as unknown as Record<string, unknown>,
-        output: (options) =>
-          JSONSchema.make(schema, {
-            target: toEffectJsonSchemaTarget(options.target),
-          }) as unknown as Record<string, unknown>,
+        input: (options) => makeMcpJsonSchema(schema, options),
+        output: (options) => makeMcpJsonSchema(schema, options),
       },
     },
   } satisfies StandardSchemaWithJSON<I, A>;

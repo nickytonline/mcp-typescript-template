@@ -1,13 +1,5 @@
 import { Config as EffectConfig, ConfigProvider, Effect } from "effect";
 
-export type Config = {
-  readonly PORT: number;
-  readonly NODE_ENV: "development" | "production" | "test";
-  readonly SERVER_NAME: string;
-  readonly SERVER_VERSION: string;
-  readonly LOG_LEVEL: "error" | "warn" | "info" | "debug";
-};
-
 const configEffect = EffectConfig.all({
   PORT: EffectConfig.number("PORT").pipe(EffectConfig.withDefault(3000)),
   NODE_ENV: EffectConfig.literal("development", "production", "test")("NODE_ENV").pipe(
@@ -24,20 +16,28 @@ const configEffect = EffectConfig.all({
   ),
 });
 
+export type Config = typeof configEffect extends EffectConfig.Config<infer A>
+  ? A
+  : never;
+
 const loadConfig = Effect.withConfigProvider(ConfigProvider.fromEnv())(configEffect);
 
 let config: Config | undefined;
+
+function failInvalidConfig(error: unknown): never {
+  process.stderr.write(`Invalid environment configuration: ${String(error)}\n`);
+  process.exit(1);
+}
 
 export function getConfig(): Config {
   if (!config) {
     try {
       config = Effect.runSync(loadConfig);
     } catch (error) {
-      process.stderr.write(`Invalid environment configuration: ${String(error)}\n`);
-      process.exit(1);
+      return failInvalidConfig(error);
     }
   }
-  return config as Config;
+  return config;
 }
 
 export function isProduction(): boolean {
