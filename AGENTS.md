@@ -37,7 +37,9 @@ npm run lint && npm run format:check && npm run build && npm run test:ci
 
 ```
 src/
-  index.ts       # HTTP routing via createMcpHandler + toNodeHandler (stateless, per-request); calls registerTools() in getServer()
+  app.ts         # Express app and MCP Node adapter wiring
+  app.test.ts    # HTTP boundary integration tests
+  index.ts       # Effect startup and shutdown; runs the app on PORT
   tools.ts       # registerTools() wiring + per-tool logic functions
   tools.test.ts  # colocated integration tests (in-memory client/server)
   config.ts      # Env var loading and validation via Effect Config
@@ -54,13 +56,13 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 
 ## Architecture
 
-- HTTP transport via Express on `PORT` (default 3000) — **not** stdio
-- Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/index.ts` and reused by the tests
+- HTTP transport via Express on `PORT` (default 3000) — **not** stdio; app wiring lives in `src/app.ts`, startup and shutdown in `src/index.ts`
+- Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/app.ts` and reused by the tests
 - Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
 - Tool workflows use `Effect` and cross the MCP callback boundary with `runMcpEffect()`
 - Effect Schemas cross the MCP boundary through `toMcpSchema()`, which supports the MCP SDK's `draft-07` and `draft-2020-12` JSON Schema targets
 - Genuine execution failures return `isError: true` (via `createErrorResult`), not thrown; valid outcomes (e.g. a user declining an elicitation) are normal results
-- Stateless per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no `Mcp-Session-Id` — `createMcpHandler`'s factory runs `getServer()` fresh for every HTTP request. It also serves older (2025-era) clients automatically via a stateless fallback, so no separate legacy transport is needed.
+- Stateless per the MCP 2026-07-28 spec: no session handshake or `Mcp-Session-Id`; `createMcpHandler` creates a fresh server per request and supports older clients through its fallback.
 - `GET /health` is a plain liveness endpoint (used by the Docker healthcheck) — `GET /mcp` itself is routed to the MCP handler and no longer doubles as one
 - If a tool needs state across calls, mint an explicit handle and have the model pass it back as an argument on the next call — there is no transport-level session to hang state off anymore
 - Graceful shutdown on `SIGTERM`/`SIGINT` (closes the handler and HTTP server in parallel with `Effect.all`, then exits)
@@ -126,7 +128,7 @@ See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full 
 
 - Framework: Vitest
 - Test files: `*.test.ts`, colocated beside the source (see `src/lib/utils.test.ts`)
-- Cover new tools, transports, config logic, and schema adapters with focused tests
+- Cover new tools, transports, config logic, schema adapters, and the HTTP app with focused tests
 - Use `async/await` for all async tests
 - Write a failing test that reproduces a bug before fixing it
 

@@ -170,7 +170,9 @@ docker compose up --build
 ```
 mcp-typescript-template/
 ├── src/
-│   ├── index.ts          # HTTP routing via createMcpHandler (stateless, per-request)
+│   ├── app.ts            # Express app and MCP Node adapter wiring
+│   ├── app.test.ts       # HTTP boundary integration tests
+│   ├── index.ts          # Effect startup and shutdown
 │   ├── tools.ts          # Tool registration (registerTools) and logic
 │   ├── tools.test.ts     # Integration tests (in-memory client/server)
 │   ├── config.ts         # Env var loading and validation (Effect Config)
@@ -193,7 +195,7 @@ mcp-typescript-template/
 This template follows a simple architecture:
 
 - **HTTP Transport** - Uses Express with `createMcpHandler` (`@modelcontextprotocol/server`) for remote MCP connections
-- **Stateless** - Per the MCP 2026-07-28 spec: no `initialize`/`initialized` handshake, no session ID — `getServer()` runs fresh for every HTTP request. Older (2025-era) clients are still served automatically via a built-in stateless fallback
+- **Stateless** - Per the MCP 2026-07-28 spec: no session handshake or session ID; the app creates a fresh server per request and supports older clients through the SDK fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
 - **Typed I/O** - Effect Schema `inputSchema`/`outputSchema` values adapted to MCP Standard Schema, plus `structuredContent` for typed results
 - **JSON Schema Dialects** - The adapter supports both MCP-requested `draft-07` and `draft-2020-12` output
