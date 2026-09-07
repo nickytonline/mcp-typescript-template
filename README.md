@@ -6,7 +6,7 @@ A TypeScript template for building remote Model Context Protocol (MCP) servers w
 
 This template provides:
 
-- **TypeScript** - Full TypeScript support with strict configuration
+- **TypeScript 7** - Native compiler with strict configuration; TypeScript 6 remains available for `typescript-eslint`'s compiler API
 - **Vite** - Fast build system with ES modules output
 - **Express** - Fast, unopinionated web framework for HTTP server
 - **ESLint + Prettier** - Code quality and formatting
@@ -54,6 +54,10 @@ npm install
 ```
 
 ## Development
+
+### Type checking
+
+`npm run typecheck` uses the TypeScript 7 compiler. The `typescript` package is an npm alias for the TypeScript 6 compatibility package because `typescript-eslint` still depends on TypeScript's legacy compiler API; the compatibility package is available as `tsc6` when needed.
 
 ### Watch mode for development (with hot reloading)
 

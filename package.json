@@ -36,6 +36,7 @@
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
     "@types/node": "^22.19.1",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.49.0",
     "concurrently": "^10.0.4",
@@ -44,7 +45,7 @@
     "globals": "^17.8.0",
     "prettier": "^3.9.6",
     "semantic-release": "^25.0.5",
-    "typescript": "^5.9.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "^8.2.1",
     "vitest": "^5.0.0"
   },

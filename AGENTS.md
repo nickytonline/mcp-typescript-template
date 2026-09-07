@@ -64,6 +64,7 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 ### Build System
 
 - Vite bundles to ES modules; `@modelcontextprotocol/server` and `@modelcontextprotocol/node` are external (not bundled)
+- TypeScript 7 provides the `tsc` compiler; the `typescript` dependency is an npm alias for `@typescript/typescript6` so `typescript-eslint` can use its legacy compiler API, and exposes `tsc6` for compatibility checks
 - `@` path alias maps to `src/`
 - Node.js 24+ required (native TypeScript type stripping used in dev)
 
