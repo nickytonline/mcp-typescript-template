@@ -1,21 +1,44 @@
-import pino from "pino";
+import { Effect, LogLevel, Logger } from "effect";
 import { getConfig } from "./config.ts";
 
 const config = getConfig();
 
-export const logger = pino({
-  level: config.LOG_LEVEL,
+type LogFields = Readonly<Record<string, unknown>>;
+type LogInput = LogFields | string;
 
-  // Base fields for all log entries
-  base: {
-    service: config.SERVER_NAME,
-    version: config.SERVER_VERSION,
-    environment: config.NODE_ENV,
-  },
+const minimumLevel = {
+  error: LogLevel.Error,
+  warn: LogLevel.Warning,
+  info: LogLevel.Info,
+  debug: LogLevel.Debug,
+} satisfies Record<ConfigLogLevel, LogLevel.LogLevel>;
 
-  // OpenTelemetry trace correlation
-  // When OTel is present, pino will automatically include traceId and spanId
-  formatters: {
-    level: (label) => ({ level: label }),
-  },
-});
+type ConfigLogLevel = "error" | "warn" | "info" | "debug";
+
+function log(level: LogLevel.LogLevel, fieldsOrMessage: LogInput, message?: string) {
+  const fields = typeof fieldsOrMessage === "string" ? {} : fieldsOrMessage;
+  const text = typeof fieldsOrMessage === "string" ? fieldsOrMessage : (message ?? "");
+
+  return Effect.logWithLevel(level, text).pipe(
+    Effect.annotateLogs({
+      service: config.SERVER_NAME,
+      version: config.SERVER_VERSION,
+      environment: config.NODE_ENV,
+      ...fields,
+    }),
+    Logger.withMinimumLogLevel(minimumLevel[config.LOG_LEVEL]),
+    Effect.provide(Logger.json),
+  );
+}
+
+/** Structured Effect logging used by the server and tool workflows. */
+export const logger = {
+  debug: (fieldsOrMessage: LogInput, message?: string) =>
+    log(LogLevel.Debug, fieldsOrMessage, message),
+  info: (fieldsOrMessage: LogInput, message?: string) =>
+    log(LogLevel.Info, fieldsOrMessage, message),
+  warn: (fieldsOrMessage: LogInput, message?: string) =>
+    log(LogLevel.Warning, fieldsOrMessage, message),
+  error: (fieldsOrMessage: LogInput, message?: string) =>
+    log(LogLevel.Error, fieldsOrMessage, message),
+};

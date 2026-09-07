@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import {
   McpServer,
@@ -32,6 +32,7 @@ afterEach(async () => {
     await harness.client.close();
     harness = undefined;
   }
+  vi.restoreAllMocks();
 });
 
 /**
@@ -97,6 +98,25 @@ function parseContent(result: CallToolResult): Record<string, unknown> {
 }
 
 describe("echo tool", () => {
+  it("advertises Effect schemas as MCP JSON Schema", async () => {
+    const { client } = await setupClientServer();
+
+    const result = await client.listTools();
+    const echoTool = result.tools.find((tool) => tool.name === "echo");
+
+    expect(echoTool).toBeDefined();
+    expect(echoTool?.inputSchema).toMatchObject({
+      type: "object",
+      properties: { message: { type: "string" } },
+      required: ["message"],
+    });
+    expect(echoTool?.outputSchema).toMatchObject({
+      type: "object",
+      properties: { echo: { type: "string" } },
+      required: ["echo"],
+    });
+  });
+
   it("echoes back the provided message", async () => {
     const { client } = await setupClientServer();
 
@@ -124,6 +144,23 @@ describe("echo tool", () => {
     expect(echoLog).toBeDefined();
     expect(echoLog?.level).toBe("debug");
     expect(echoLog?.data).toEqual({ message: "hi" });
+  });
+
+  it("still returns the result when client logging fails", async () => {
+    vi.spyOn(McpServer.prototype, "sendLoggingMessage").mockRejectedValue(
+      new Error("client disconnected"),
+    );
+    const { client } = await setupClientServer();
+
+    const result = await client.callTool({
+      name: "echo",
+      arguments: { message: "logging failure is isolated" },
+    });
+
+    expect(result.structuredContent).toEqual({
+      echo: "logging failure is isolated",
+    });
+    expect(result.isError).toBeFalsy();
   });
 });
 

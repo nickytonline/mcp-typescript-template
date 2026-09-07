@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
+import { Effect } from "effect";
 
 /**
  * Creates a successful CallToolResult from any data.
@@ -52,4 +53,9 @@ export function createTextResult(data: unknown): CallToolResult {
  */
 export function createErrorResult(data: unknown): CallToolResult {
   return { ...createTextResult(data), isError: true };
+}
+
+/** Runs a pure or asynchronous Effect at an MCP callback boundary. */
+export function runMcpEffect<A, E>(effect: Effect.Effect<A, E>): Promise<A> {
+  return Effect.runPromise(effect);
 }

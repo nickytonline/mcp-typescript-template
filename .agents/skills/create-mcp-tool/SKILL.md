@@ -3,7 +3,7 @@ name: create-mcp-tool
 description: Add a new MCP tool to this server template. Use when asked to "add a tool", "add an MCP tool", "create a new tool", or "implement a new tool".
 metadata:
   author: nickytonline
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Add an MCP Tool to This Template
@@ -19,11 +19,11 @@ This skill walks you through adding a new tool to the MCP server. If you need to
 | Tool registration | `src/tools.ts` inside `registerTools(server)` via `server.registerTool()` |
 | Tool logic | `src/tools.ts` — functions that take only the dependencies they need |
 | Response formatting | `createTextResult()` / `createErrorResult()` from `src/lib/utils.ts` |
-| Input validation | Zod `inputSchema` defined inline in `server.registerTool()` |
+| Input validation | Effect `Schema` adapted with `toMcpSchema()` |
 | Typed output | `outputSchema` + `structuredContent` (emitted automatically by `createTextResult`) |
 | Tests | `src/tools.test.ts` (colocated with `src/tools.ts`) |
 
-Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/index.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is a function that takes only the dependencies it needs (e.g. the bound `sendLoggingMessage` function and the `ctx` object), which keeps it small and easy to drive through every branch. `index.ts` owns only HTTP routing via `createMcpHandler` — per the MCP 2026-07-28 spec there's no session: `getServer()` runs fresh for every request.
+Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/app.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is an `Effect` workflow that takes only the dependencies it needs (e.g. the bound `sendLoggingMessage` function and the `ctx` object), which keeps it small and easy to drive through every branch. Return `runMcpEffect(effect)` only at the MCP callback boundary. Use `Effect.all` with explicit concurrency for independent parallel work; keep `Effect.tryPromise` at Promise-based API boundaries. `app.ts` owns HTTP routing via `createMcpHandler`, while `index.ts` owns startup and shutdown; per the MCP 2026-07-28 spec there's no session: `getServer()` runs fresh for every request.
 
 ---
 
@@ -31,7 +31,7 @@ Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the si
 
 Tool names should use `snake_case` — this is the prevailing community convention (e.g. `get_user`, `search_documents`, `list_items`). The MCP spec ([SEP-986](https://modelcontextprotocol.io/seps/986-specify-format-for-tool-names)) allows `a-z`, `A-Z`, `0-9`, `_`, `-`, `.`, and `/`, but does not mandate a style. Names must be 1–64 characters and unique within the server.
 
-The tool's `description` and every Zod field's `.describe()` are how LLM clients decide *when* and *how* to call the tool — write them as if you're explaining the tool to someone who has never seen the codebase.
+The tool's `description` and every Effect Schema field's `description` annotation are how LLM clients decide *when* and *how* to call the tool — write them as if you're explaining the tool to someone who has never seen the codebase.
 
 ---
 
@@ -45,43 +45,65 @@ server.registerTool(
   {
     title: "My Tool",
     description: "A clear, specific description of what this tool does and when to use it",
-    inputSchema: z.object({
-      query: z.string().describe("The input to process — be specific about format or constraints"),
-      limit: z.number().int().min(1).max(100).optional().describe("Maximum number of results to return (default: 10)"),
-    }),
+    inputSchema: toMcpSchema(
+      Schema.Struct({
+        query: Schema.String.annotations({
+          description: "The input to process — be specific about format or constraints",
+        }),
+        limit: Schema.optional(
+          Schema.Int.pipe(Schema.between(1, 100)).annotations({
+            description: "Maximum number of results to return (default: 10)",
+          }),
+        ),
+      }),
+    ),
     // Declare the shape of a successful result so clients can consume
     // structuredContent (createTextResult emits it automatically).
-    outputSchema: z.object({
-      output: z.string().describe("The processed output"),
-      count: z.number().describe("Number of results"),
-    }),
+    outputSchema: toMcpSchema(
+      Schema.Struct({
+        output: Schema.String,
+        count: Schema.Number,
+      }),
+    ),
     annotations: { readOnlyHint: true, openWorldHint: false },
   },
-  (args, ctx) => myTool(args, ctx),
+  (args, ctx) => runMcpEffect(myTool(args, ctx)),
 );
 ```
 
-Then implement `myTool` as a function lower in the file:
+Use the shared adapter and Effect imports:
 
 ```typescript
-async function myTool(
+import { Effect, Schema } from "effect";
+import { toMcpSchema } from "./lib/mcp-schema.ts";
+import { createErrorResult, createTextResult, runMcpEffect } from "./lib/utils.ts";
+```
+
+Then implement `myTool` as an Effect workflow lower in the file:
+
+```typescript
+function myTool(
   args: { query: string; limit?: number },
   ctx: ServerContext,
-): Promise<CallToolResult> {
-  const toolName = "my_tool";
-  const requestId = ctx.mcpReq.id;
+): Effect.Effect<CallToolResult> {
+  return Effect.gen(function* () {
+    const toolName = "my_tool";
+    const requestId = ctx.mcpReq.id;
 
-  const result = { output: args.query, count: 1 };
-  logger.info({ toolName, requestId }, "Tool executed");
-  return createTextResult(result);
+    const result = { output: args.query, count: 1 };
+    yield* logger.info({ toolName, requestId }, "Tool executed");
+    return createTextResult(result);
+  });
 }
 ```
 
 Key points:
-- `inputSchema` / `outputSchema` must be a `z.object({...})` — the bare `{ field: z.string() }` shorthand is deprecated
+- Define input and output contracts with Effect `Schema.Struct(...)`, then wrap them with `toMcpSchema(...)`. The adapter supplies both Standard Schema validation and the JSON Schema needed by MCP, including `draft-07` and `draft-2020-12` targets
+- Use `Schema.annotations({ description: "..." })` for field descriptions; use Effect combinators such as `Schema.optional`, `Schema.Int`, and `Schema.between` for constraints
+- Keep the tool's business logic in an `Effect.Effect` and call `runMcpEffect()` only in the MCP registration callback
 - Return `createTextResult(data)` on success — it emits both a text block and `structuredContent` for `outputSchema`-aware clients ([structured content](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content))
 - Keep the tool's logic in a function that receives only the dependencies it needs (e.g. `sendLoggingMessage`, `ctx`); pass them from the registration callback with `.bind()` where needed. This keeps each tool small and testable
-- Log tool execution with `logger.info` and failures with `logger.error`, always including `toolName` and `requestId` (`ctx.mcpReq.id`) for correlation — there's no `sessionId` under the stateless spec
+- Yield `logger.info`/`logger.error` Effects inside the workflow, always including `toolName` and `requestId` (`ctx.mcpReq.id`) for correlation — there's no `sessionId` under the stateless spec
 - Never log the raw `args` object — tool inputs may carry user-provided or sensitive data. Log individual fields only when they're known to be safe (see `action`/`kind` in `elicitEcho`'s error/decline/cancel logs in `src/tools.ts`)
 
 ### Tool Annotations
@@ -101,13 +123,13 @@ server.registerTool(
   {
     title: "My Tool",
     description: "...",
-    inputSchema: { /* ... */ },
+    inputSchema: toMcpSchema(Schema.Struct({ /* ... */ })),
     annotations: {
       readOnlyHint: true,    // this tool only reads, never writes
       openWorldHint: false,  // operates on a closed local domain
     },
   },
-  async (args) => { /* ... */ },
+  (args, ctx) => runMcpEffect(myTool(args, ctx)),
 );
 ```
 
@@ -118,23 +140,24 @@ server.registerTool(
 Report execution failures in-band with `createErrorResult` (which sets `isError: true`) rather than throwing — this lets the client/model distinguish a failure from a normal result. Reserve `isError` for genuine failures; valid outcomes (e.g. a user declining an elicitation, or an empty search) are normal results via `createTextResult`. See [Error Handling](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#error-handling) in the spec.
 
 ```typescript
-async function myTool(args, ctx) {
-  const toolName = "my_tool";
-  const requestId = ctx.mcpReq.id;
+function myTool(args, ctx): Effect.Effect<CallToolResult> {
+  return Effect.gen(function* () {
+    const toolName = "my_tool";
+    const requestId = ctx.mcpReq.id;
 
-  try {
-    const result = await doSomething(args.query);
-    logger.info({ toolName, requestId }, "Tool executed");
-    return createTextResult(result);
-  } catch (error) {
-    logger.error(
-      { toolName, requestId, error: error instanceof Error ? error.message : String(error) },
-      "Tool execution failed",
+    const result = yield* Effect.tryPromise({
+      try: () => doSomething(args.query),
+      catch: (error) => (error instanceof Error ? error.message : String(error)),
+    }).pipe(
+      Effect.tapError((error) =>
+        logger.error({ toolName, requestId, error }, "Tool execution failed"),
+      ),
     );
-    return createErrorResult({
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+    yield* logger.info({ toolName, requestId }, "Tool executed");
+    return createTextResult(result);
+  }).pipe(
+    Effect.catchAll((error) => Effect.succeed(createErrorResult({ error }))),
+  );
 }
 ```
 
@@ -143,28 +166,33 @@ async function myTool(args, ctx) {
 If a tool must ask the user something before it can finish (the `elicit_echo` pattern), don't use the old synchronous `elicitInput()` push request — it throws on a 2026-07-28-era connection. Instead return an `inputRequired()` result and read the response back via `inputResponse()`/`ctx.mcpReq.inputResponses` on the retried call:
 
 ```typescript
+import type { CallToolResult, InputRequiredResult, ServerContext } from "@modelcontextprotocol/server";
 import { inputRequired, inputResponse } from "@modelcontextprotocol/server";
+import { Effect } from "effect";
 
-function myTool(ctx: ServerContext): CallToolResult | InputRequiredResult {
-  const response = inputResponse(ctx.mcpReq.inputResponses, "confirm");
+function myTool(ctx: ServerContext): Effect.Effect<CallToolResult | InputRequiredResult> {
+  return Effect.gen(function* () {
+    const response = inputResponse(ctx.mcpReq.inputResponses, "confirm");
 
-  if (response.kind === "missing") {
-    return inputRequired({
-      inputRequests: {
-        confirm: inputRequired.elicit({
-          message: "Proceed?",
-          requestedSchema: {
-            type: "object",
-            properties: { confirm: { type: "boolean" } },
-            required: ["confirm"],
-          },
-        }),
-      },
-    });
-  }
+    if (response.kind === "missing") {
+      return inputRequired({
+        inputRequests: {
+          confirm: inputRequired.elicit({
+            message: "Proceed?",
+            requestedSchema: {
+              type: "object",
+              properties: { confirm: { type: "boolean" } },
+              required: ["confirm"],
+            },
+          }),
+        },
+      });
+    }
 
-  // response.kind === "elicit" here; handle response.action (accept/decline/cancel)
-  // ...
+    // response.kind === "elicit" here; handle response.action (accept/decline/cancel)
+    // ...
+    return createTextResult({ ok: true });
+  });
 }
 ```
 
@@ -244,6 +272,7 @@ Key points:
 - Use `afterEach` to close both sides leak-safely, even if assertions fail
 - The existing `setupClientServer` takes an options object — pass `elicitHandler` to answer elicitation, `supportsElicitation: false` to test the unsupported-client path, and `onLog` to capture outbound logging notifications. Reuse it rather than adding new helpers
 - `client.callTool()` already returns a typed `CallToolResult` — no schema re-validation needed, just narrow `content[0].type === "text"` before parsing it
+- Add a schema-advertising assertion with `client.listTools()` when a tool introduces or changes an input/output schema
 - Assert `result.structuredContent` for `outputSchema`-aware output, and `result.isError` to confirm failures are flagged (and that valid outcomes are *not*)
 
 Run tests with:
