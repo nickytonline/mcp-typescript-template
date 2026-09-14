@@ -46,7 +46,7 @@
     "prettier": "^3.9.6",
     "semantic-release": "^25.0.5",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.2.1",
+    "vite": "^8.3.0",
     "vitest": "^5.0.0"
   },
   "dependencies": {
