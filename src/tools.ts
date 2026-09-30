@@ -10,12 +10,6 @@ import { toMcpSchema } from "./lib/mcp-schema.ts";
 import { createErrorResult, createTextResult, runMcpEffect } from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 
-type SendLoggingMessageFn = (params: {
-  level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency";
-  data: unknown;
-  logger?: string;
-}) => Promise<void>;
-
 const ELICIT_ECHO_MESSAGE_KEY = "message";
 
 const ElicitEchoOutputSchema = toMcpSchema(
@@ -89,7 +83,7 @@ export function registerTools(server: McpServer): void {
         openWorldHint: false,
       },
     },
-    (args, ctx) => runMcpEffect(echo(server.sendLoggingMessage.bind(server), args, ctx)),
+    (args, ctx) => runMcpEffect(echo(args, ctx)),
   );
 }
 
@@ -180,38 +174,20 @@ function elicitEcho(
 }
 
 /**
- * Echoes back the provided message. Also sends a debug log notification
- * to the client as a demonstration of MCP logging.
+ * Echoes back the provided message.
+ *
+ * Server logs go through the Effect logger. MCP logging notifications are
+ * deprecated as of protocol revision 2026-07-28 (SEP-2577), and
+ * `logging/setLevel` is gone: a server must not emit `notifications/message`
+ * unless the request opted in with `io.modelcontextprotocol/logLevel`.
  */
 function echo(
-  sendLoggingMessage: SendLoggingMessageFn,
   args: { message: string },
   ctx: ServerContext,
 ): Effect.Effect<CallToolResult> {
   return Effect.gen(function* () {
     const toolName = "echo";
     const requestId = ctx.mcpReq.id;
-    // Example: send an MCP log notification to the client. The client
-    // controls which levels it receives via logging/setLevel.
-    // See: https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging
-    yield* Effect.tryPromise({
-      try: () =>
-        sendLoggingMessage({
-          level: "debug",
-          data: { message: args.message },
-          logger: "echo",
-        }),
-      catch: (error) => error,
-    }).pipe(
-      // Log notification failures must not prevent the tool from responding.
-      Effect.catchAll((error) =>
-        logger.debug(
-          { error: error instanceof Error ? error.message : String(error) },
-          "Failed to send MCP log notification",
-        ),
-      ),
-    );
-
     const data = { echo: args.message };
     yield* logger.info({ toolName, requestId }, "Tool executed");
     return createTextResult(data);

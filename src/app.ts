@@ -9,17 +9,10 @@ import { runMcpEffect } from "./lib/utils.ts";
 
 const getServer = () => {
   const config = getConfig();
-  const server = new McpServer(
-    {
-      name: config.SERVER_NAME,
-      version: config.SERVER_VERSION,
-    },
-    {
-      capabilities: {
-        logging: {},
-      },
-    },
-  );
+  const server = new McpServer({
+    name: config.SERVER_NAME,
+    version: config.SERVER_VERSION,
+  });
 
   registerTools(server);
 

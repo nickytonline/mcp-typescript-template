@@ -84,7 +84,7 @@ server.registerTool(
 Preserve the existing integration coverage and add focused tests for migration-sensitive behavior:
 
 - `src/lib/mcp-schema.test.ts` validates Effect schemas and both JSON Schema dialects.
-- `src/tools.test.ts` uses an in-memory MCP client/server to test tool calls, structured output, logging, elicitation outcomes, and modern-era behavior.
+- `src/tools.test.ts` uses an in-memory MCP client/server to test tool calls, structured output, elicitation outcomes, and modern-era behavior.
 - Assert `client.listTools()` exposes the expected input/output JSON Schemas when schemas change.
 - Run `npm run lint`, `npm run format:check`, `npm run build`, and `npm run test:ci`.
 - Manually smoke-test `/health` and `/mcp` when the HTTP boundary changes.
