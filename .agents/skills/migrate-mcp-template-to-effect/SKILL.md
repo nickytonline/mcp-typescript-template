@@ -19,7 +19,7 @@ Keep these behaviors unless the user explicitly requests a separate breaking cha
 - `@modelcontextprotocol/server` remains the MCP implementation
 - Express remains the HTTP server and `/mcp` remains the MCP endpoint
 - `/health` remains a plain `{ "status": "ok" }` liveness endpoint
-- `PORT`, `NODE_ENV`, `SERVER_NAME`, `SERVER_VERSION`, and `LOG_LEVEL` keep their names and defaults
+- `PORT`, `NODE_ENV`, `SERVER_NAME`, `SERVER_VERSION`, and `LOG_LEVEL` keep their names. `SERVER_NAME` and `SERVER_VERSION` default to `package.json` `name` and `version`
 - tool names, MCP annotations, structured output, and elicitation behavior remain compatible
 
 Effect should be introduced behind the MCP SDK boundary. Do not replace the official MCP server with Effect's separate native MCP implementation as part of this migration.

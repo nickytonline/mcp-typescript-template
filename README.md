@@ -136,7 +136,7 @@ Both tools declare an `outputSchema` and return `structuredContent` alongside th
 
 ## Customizing Your MCP Server
 
-1. **Update package.json** - Change name, description, and keywords
+1. **Update package.json** - Change name, description, version, and keywords. `name` and `version` are the MCP server name and version (override with `SERVER_NAME` and `SERVER_VERSION` if needed)
 2. **Modify src/tools.ts** - Replace the `echo` / `elicit_echo` tools with your custom tools
 3. **Add your logic** - Create additional TypeScript files for your business logic
 4. **Update README** - Document your specific MCP server functionality

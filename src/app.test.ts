@@ -1,6 +1,7 @@
 import { createServer, type Server as HttpServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import packageJson from "../package.json" with { type: "json" };
 import { createApp } from "./app.ts";
 
 type AppHarness = {
@@ -74,6 +75,15 @@ describe("HTTP app", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: "ok" });
+  });
+
+  it("identifies the server with the package.json name and version", async () => {
+    const { client } = await setupHttpClient();
+
+    expect(client.getServerVersion()).toMatchObject({
+      name: packageJson.name,
+      version: packageJson.version,
+    });
   });
 
   it("serves MCP requests through Express and the Node adapter", async () => {

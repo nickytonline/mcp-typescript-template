@@ -82,8 +82,8 @@ Defined and validated in `src/config.ts`:
 |------------------|----------------------------|--------------------------------------|
 | `PORT`           | `3000`                     | HTTP server port                     |
 | `NODE_ENV`       | —                          | `development` / `production` / `test` |
-| `SERVER_NAME`    | `mcp-typescript-template`  | MCP server name                      |
-| `SERVER_VERSION` | `1.0.0`                    | MCP server version                   |
+| `SERVER_NAME`    | package.json `name`        | MCP server name                      |
+| `SERVER_VERSION` | package.json `version`     | MCP server version                   |
 | `LOG_LEVEL`      | `info`                     | `error` / `warn` / `info` / `debug`  |
 
 ## Coding Conventions
@@ -136,7 +136,7 @@ See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full 
 
 To build your own MCP server from this template:
 
-1. Update `package.json` (name, description, version)
+1. Update `package.json` (name, description, version). `name` and `version` are the MCP server name and version unless `SERVER_NAME` or `SERVER_VERSION` is set
 2. Add/replace env vars in `src/config.ts`
 3. Replace the `echo` / `elicit_echo` tools in `src/tools.ts` with your tools
 4. Add business logic under `src/`
