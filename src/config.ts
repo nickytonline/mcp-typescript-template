@@ -1,4 +1,5 @@
 import { Config as EffectConfig, ConfigProvider, Effect } from "effect";
+import packageJson from "../package.json" with { type: "json" };
 
 const configEffect = EffectConfig.all({
   PORT: EffectConfig.number("PORT").pipe(EffectConfig.withDefault(3000)),
@@ -6,10 +7,10 @@ const configEffect = EffectConfig.all({
     EffectConfig.withDefault("development"),
   ),
   SERVER_NAME: EffectConfig.string("SERVER_NAME").pipe(
-    EffectConfig.withDefault("mcp-typescript-template"),
+    EffectConfig.withDefault(packageJson.name),
   ),
   SERVER_VERSION: EffectConfig.string("SERVER_VERSION").pipe(
-    EffectConfig.withDefault("1.0.0"),
+    EffectConfig.withDefault(packageJson.version),
   ),
   LOG_LEVEL: EffectConfig.literal("error", "warn", "info", "debug")("LOG_LEVEL").pipe(
     EffectConfig.withDefault("info"),
