@@ -23,7 +23,7 @@ This skill walks you through adding a new tool to the MCP server. If you need to
 | Typed output | `outputSchema` + `structuredContent` (emitted automatically by `createTextResult`) |
 | Tests | `src/tools.test.ts` (colocated with `src/tools.ts`) |
 
-Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/app.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is an `Effect` workflow that takes only the dependencies it needs (e.g. the bound `sendLoggingMessage` function and the `ctx` object), which keeps it small and easy to drive through every branch. Return `runMcpEffect(effect)` only at the MCP callback boundary. Use `Effect.all` with explicit concurrency for independent parallel work; keep `Effect.tryPromise` at Promise-based API boundaries. `app.ts` owns HTTP routing via `createMcpHandler`, while `index.ts` owns startup and shutdown; per the MCP 2026-07-28 spec there's no session: `getServer()` runs fresh for every request.
+Everything for a tool lives in `src/tools.ts`. `registerTools(server)` is the single source of truth for tool wiring — it's called from `getServer()` in `src/app.ts` **and** reused by the tests, so registration can never drift from what's tested. Each tool's implementation is an `Effect` workflow that takes the arguments and `ctx` it uses, which keeps it small and easy to drive through every branch. Return `runMcpEffect(effect)` only at the MCP callback boundary. Use `Effect.all` with explicit concurrency for independent parallel work; keep `Effect.tryPromise` at Promise-based API boundaries. `app.ts` owns HTTP routing via `createMcpHandler`, while `index.ts` owns startup and shutdown; per the MCP 2026-07-28 spec there's no session: `getServer()` runs fresh for every request.
 
 ---
 
@@ -102,7 +102,7 @@ Key points:
 - Use `Schema.annotations({ description: "..." })` for field descriptions; use Effect combinators such as `Schema.optional`, `Schema.Int`, and `Schema.between` for constraints
 - Keep the tool's business logic in an `Effect.Effect` and call `runMcpEffect()` only in the MCP registration callback
 - Return `createTextResult(data)` on success — it emits both a text block and `structuredContent` for `outputSchema`-aware clients ([structured content](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content))
-- Keep the tool's logic in a function that receives only the dependencies it needs (e.g. `sendLoggingMessage`, `ctx`); pass them from the registration callback with `.bind()` where needed. This keeps each tool small and testable
+- Keep the tool's logic in a function that receives the arguments and `ctx` it uses. This keeps each tool small and testable
 - Yield `logger.info`/`logger.error` Effects inside the workflow, always including `toolName` and `requestId` (`ctx.mcpReq.id`) for correlation — there's no `sessionId` under the stateless spec
 - Never log the raw `args` object — tool inputs may carry user-provided or sensitive data. Log individual fields only when they're known to be safe (see `action`/`kind` in `elicitEcho`'s error/decline/cancel logs in `src/tools.ts`)
 
@@ -223,10 +223,7 @@ afterEach(async () => {
 });
 
 async function setupClientServer() {
-  const server = new McpServer(
-    { name: "test-server", version: "0.0.0" },
-    { capabilities: { logging: {} } },
-  );
+  const server = new McpServer({ name: "test-server", version: "0.0.0" });
   registerTools(server);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -270,7 +267,7 @@ Key points:
 - Use `InMemoryTransport.createLinkedPair()` to connect a real `Client` and `McpServer` in-process — no HTTP server needed
 - Connect the server before the client (`server.connect` then `client.connect`) so the initialize handshake completes
 - Use `afterEach` to close both sides leak-safely, even if assertions fail
-- The existing `setupClientServer` takes an options object — pass `elicitHandler` to answer elicitation, `supportsElicitation: false` to test the unsupported-client path, and `onLog` to capture outbound logging notifications. Reuse it rather than adding new helpers
+- The existing `setupClientServer` takes an options object — pass `elicitHandler` to answer elicitation, and `supportsElicitation: false` to test the unsupported-client path. Reuse it rather than adding new helpers
 - `client.callTool()` already returns a typed `CallToolResult` — no schema re-validation needed, just narrow `content[0].type === "text"` before parsing it
 - Add a schema-advertising assertion with `client.listTools()` when a tool introduces or changes an input/output schema
 - Assert `result.structuredContent` for `outputSchema`-aware output, and `result.isError` to confirm failures are flagged (and that valid outcomes are *not*)

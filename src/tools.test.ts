@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import {
   McpServer,
@@ -20,8 +20,8 @@ type SetupOptions = {
   elicitHandler?: (request: { message: string }) => Promise<ElicitResult>;
   /** Whether the client advertises elicitation support. Defaults to true. */
   supportsElicitation?: boolean;
-  /** Collects any logging notifications the server sends to the client. */
-  onLog?: (params: { level: string; data: unknown; logger?: string }) => void;
+  /** Collects notification methods the server sends to the client. */
+  onNotification?: (method: string) => void;
 };
 
 let harness: TestHarness | undefined;
@@ -32,7 +32,6 @@ afterEach(async () => {
     await harness.client.close();
     harness = undefined;
   }
-  vi.restoreAllMocks();
 });
 
 /**
@@ -49,15 +48,12 @@ afterEach(async () => {
  * A single helper covers every case:
  *   - pass an `elicitHandler` to answer elicitation requests
  *   - set `supportsElicitation: false` to test the unsupported-client path
- *   - pass `onLog` to capture outbound logging notifications
+ *   - pass `onNotification` to capture outbound notification methods
  */
 async function setupClientServer(options: SetupOptions = {}) {
-  const { elicitHandler, supportsElicitation = true, onLog } = options;
+  const { elicitHandler, supportsElicitation = true, onNotification } = options;
 
-  const server = new McpServer(
-    { name: "test-server", version: "0.0.0" },
-    { capabilities: { logging: {} } },
-  );
+  const server = new McpServer({ name: "test-server", version: "0.0.0" });
   registerTools(server);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -73,11 +69,9 @@ async function setupClientServer(options: SetupOptions = {}) {
     });
   }
 
-  if (onLog) {
+  if (onNotification) {
     client.fallbackNotificationHandler = async (notification) => {
-      if (notification.method === "notifications/message") {
-        onLog(notification.params as { level: string; data: unknown; logger?: string });
-      }
+      onNotification(notification.method);
     };
   }
 
@@ -132,35 +126,15 @@ describe("echo tool", () => {
     expect(result.isError).toBeFalsy();
   });
 
-  it("sends an MCP log notification to the client", async () => {
-    const logs: Array<{ level: string; data: unknown; logger?: string }> = [];
-    const { client } = await setupClientServer({ onLog: (params) => logs.push(params) });
+  it("does not emit an MCP logging notification", async () => {
+    const methods: string[] = [];
+    const { client } = await setupClientServer({
+      onNotification: (method) => methods.push(method),
+    });
 
-    // Ask to receive debug-level notifications, then invoke the tool.
-    await client.setLoggingLevel("debug");
     await client.callTool({ name: "echo", arguments: { message: "hi" } });
 
-    const echoLog = logs.find((l) => l.logger === "echo");
-    expect(echoLog).toBeDefined();
-    expect(echoLog?.level).toBe("debug");
-    expect(echoLog?.data).toEqual({ message: "hi" });
-  });
-
-  it("still returns the result when client logging fails", async () => {
-    vi.spyOn(McpServer.prototype, "sendLoggingMessage").mockRejectedValue(
-      new Error("client disconnected"),
-    );
-    const { client } = await setupClientServer();
-
-    const result = await client.callTool({
-      name: "echo",
-      arguments: { message: "logging failure is isolated" },
-    });
-
-    expect(result.structuredContent).toEqual({
-      echo: "logging failure is isolated",
-    });
-    expect(result.isError).toBeFalsy();
+    expect(methods).not.toContain("notifications/message");
   });
 });
 
@@ -267,10 +241,7 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
   async function setupModernEraClient(options: { supportsElicitation?: boolean } = {}) {
     const { supportsElicitation = true } = options;
 
-    const server = new McpServer(
-      { name: "test-server", version: "0.0.0" },
-      { capabilities: { logging: {} } },
-    );
+    const server = new McpServer({ name: "test-server", version: "0.0.0" });
     registerTools(server);
 
     const handler = createMcpHandler(() => server);
