@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../package.json", () => ({
+  default: {
+    name: "from-package-json",
+    version: "9.9.9",
+  },
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -11,7 +18,7 @@ async function importConfig() {
 }
 
 describe("configuration", () => {
-  it("uses the documented defaults", async () => {
+  it("defaults the server name and version from package.json", async () => {
     vi.stubEnv("PORT", undefined);
     vi.stubEnv("NODE_ENV", undefined);
     vi.stubEnv("SERVER_NAME", undefined);
@@ -23,8 +30,8 @@ describe("configuration", () => {
     expect(getConfig()).toEqual({
       PORT: 3000,
       NODE_ENV: "development",
-      SERVER_NAME: "mcp-typescript-template",
-      SERVER_VERSION: "1.0.0",
+      SERVER_NAME: "from-package-json",
+      SERVER_VERSION: "9.9.9",
       LOG_LEVEL: "info",
     });
   });
