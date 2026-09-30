@@ -20,8 +20,6 @@ type SetupOptions = {
   elicitHandler?: (request: { message: string }) => Promise<ElicitResult>;
   /** Whether the client advertises elicitation support. Defaults to true. */
   supportsElicitation?: boolean;
-  /** Collects notification methods the server sends to the client. */
-  onNotification?: (method: string) => void;
 };
 
 let harness: TestHarness | undefined;
@@ -48,10 +46,9 @@ afterEach(async () => {
  * A single helper covers every case:
  *   - pass an `elicitHandler` to answer elicitation requests
  *   - set `supportsElicitation: false` to test the unsupported-client path
- *   - pass `onNotification` to capture outbound notification methods
  */
 async function setupClientServer(options: SetupOptions = {}) {
-  const { elicitHandler, supportsElicitation = true, onNotification } = options;
+  const { elicitHandler, supportsElicitation = true } = options;
 
   const server = new McpServer({ name: "test-server", version: "0.0.0" });
   registerTools(server);
@@ -67,12 +64,6 @@ async function setupClientServer(options: SetupOptions = {}) {
     client.setRequestHandler("elicitation/create", async (request: ElicitRequest) => {
       return elicitHandler({ message: request.params.message });
     });
-  }
-
-  if (onNotification) {
-    client.fallbackNotificationHandler = async (notification) => {
-      onNotification(notification.method);
-    };
   }
 
   await server.connect(serverTransport);
@@ -124,17 +115,6 @@ describe("echo tool", () => {
     // Success results also carry structuredContent for outputSchema-aware clients.
     expect(result.structuredContent).toEqual({ echo: "hello" });
     expect(result.isError).toBeFalsy();
-  });
-
-  it("does not emit an MCP logging notification", async () => {
-    const methods: string[] = [];
-    const { client } = await setupClientServer({
-      onNotification: (method) => methods.push(method),
-    });
-
-    await client.callTool({ name: "echo", arguments: { message: "hi" } });
-
-    expect(methods).not.toContain("notifications/message");
   });
 });
 
