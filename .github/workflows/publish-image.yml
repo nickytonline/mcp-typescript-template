@@ -22,7 +22,8 @@ jobs:
   publish:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
 
     steps:
@@ -31,8 +32,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: >-
-            ${{ github.event_name == 'workflow_run' &&
-            github.event.workflow_run.head_sha || github.sha }}
+            ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -47,15 +47,19 @@ jobs:
       - name: Determine image tags
         id: tags
         env:
-          SOURCE_SHA: >-
-            ${{ github.event_name == 'workflow_run' &&
-            github.event.workflow_run.head_sha || github.sha }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || '' }}
           VERSION_INPUT: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          if [ -n "$EXPECTED_SHA" ] && [ "$source_sha" != "$EXPECTED_SHA" ]; then
+            echo "main moved since the release workflow ran" >&2
+            exit 1
+          fi
+
           version="$VERSION_INPUT"
           if [ -z "$version" ]; then
-            version="$(git tag --points-at "$SOURCE_SHA" \
+            version="$(git tag --points-at "$source_sha" \
               | sed -n 's/^v//p' \
               | head -n 1)"
           fi
@@ -63,11 +67,12 @@ jobs:
           {
             echo 'tags<<EOF'
             echo "${IMAGE}:latest"
-            echo "${IMAGE}:sha-${SOURCE_SHA}"
+            echo "${IMAGE}:sha-${source_sha}"
             if [ -n "$version" ]; then
               echo "${IMAGE}:${version}"
             fi
             echo EOF
+            echo "source_sha=$source_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
@@ -78,6 +83,5 @@ jobs:
           push: true
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha || github.sha }}
+            org.opencontainers.image.revision=${{ steps.tags.outputs.source_sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-
