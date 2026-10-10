@@ -32,7 +32,8 @@ jobs:
         with:
           fetch-depth: 0
           ref: >-
-            ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
+            ${{ github.event_name == 'workflow_run' && 'main' ||
+            (inputs.version != '' && format('v{0}', inputs.version) || github.ref) }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -58,15 +59,31 @@ jobs:
           fi
 
           version="$VERSION_INPUT"
+          if [ -n "$version" ]; then
+            expected_tag="v${version}"
+            actual_tag="$(git describe --tags --exact-match HEAD)"
+            if [ "$actual_tag" != "$expected_tag" ]; then
+              echo "checked out $actual_tag, expected $expected_tag" >&2
+              exit 1
+            fi
+          fi
+
           if [ -z "$version" ]; then
             version="$(git tag --points-at "$source_sha" \
               | sed -n 's/^v//p' \
               | head -n 1)"
           fi
 
+          latest_version="$(git tag --sort=-version:refname \
+            | sed -n '/^v[0-9]/p' \
+            | head -n 1 \
+            | sed 's/^v//')"
+
           {
             echo 'tags<<EOF'
-            echo "${IMAGE}:latest"
+            if [ -z "$version" ] || [ "$version" = "$latest_version" ]; then
+              echo "${IMAGE}:latest"
+            fi
             echo "${IMAGE}:sha-${source_sha}"
             if [ -n "$version" ]; then
               echo "${IMAGE}:${version}"
