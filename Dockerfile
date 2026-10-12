@@ -11,8 +11,9 @@ RUN npm ci --prefer-offline
 
 COPY *.ts *.json ./
 COPY ./src/ ./src/
+COPY ./skills/ ./skills/
 
-RUN npm run build
+RUN npm run build && test -s /app/skills/example-skill/SKILL.md
 
 EXPOSE 3000
 

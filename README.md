@@ -13,6 +13,7 @@ This template provides:
 - **ESLint + Prettier** - Code quality and formatting
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
+- **Example Skill** - `example-skill` demonstrating an Agent Skill served over the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)
 
 ## Getting Started
 
@@ -134,12 +135,23 @@ Demonstrates [MCP elicitation](https://modelcontextprotocol.io/specification/202
 
 Both tools declare an `outputSchema` and return `structuredContent` alongside the text result, and carry `annotations` (`readOnlyHint`, `idempotentHint`, `openWorldHint`) describing their safety profile.
 
+## Available Skill
+
+The template includes one sample Agent Skill, in the same role as `echo`:
+
+### example-skill
+
+`skills/example-skill/SKILL.md` is published at `skill://example-skill/SKILL.md`. Clients that support the MCP Skills extension discover it with `skills/list` or `skills/get`, then read the same bytes with `resources/read`. The server instructions include that URI for clients without the extension. Reading the resource does not activate the skill.
+
+Replace this skill with your own guidance. Keep the directory name and the frontmatter `name` identical, and update `SKILL_DIRECTORY_NAME` in `src/skills.ts`. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md) for discovery, trust, and packaging notes.
+
 ## Customizing Your MCP Server
 
 1. **Update package.json** - Change `name`, `version`, description, and keywords. The MCP server name and version are read from `name` and `version` unless `SERVER_NAME` or `SERVER_VERSION` is set
 2. **Modify src/tools.ts** - Replace the `echo` / `elicit_echo` tools with your custom tools
-3. **Add your logic** - Create additional TypeScript files for your business logic
-4. **Update README** - Document your specific MCP server functionality
+3. **Replace the sample skill** - Replace `skills/example-skill` and `SKILL_DIRECTORY_NAME` in `src/skills.ts` with your Agent Skill
+4. **Add your logic** - Create additional TypeScript files for your business logic
+5. **Update README** - Document your specific MCP server functionality
 
 ## Docker
 
@@ -177,11 +189,17 @@ mcp-typescript-template/
 │   ├── tools.test.ts     # Integration tests (in-memory client/server)
 │   ├── config.ts         # Env var loading and validation (Effect Config)
 │   ├── logger.ts         # Effect structured logging
+│   ├── skills.ts         # Sample Agent Skill and Skills extension handlers
+│   ├── skills.test.ts    # Skill discovery, manifest, and resource tests
 │   └── lib/
 │       ├── utils.ts      # MCP response helpers
 │       ├── mcp-schema.ts  # Effect Schema → MCP Standard Schema adapter
 │       ├── utils.test.ts # Unit tests
 │       └── mcp-schema.test.ts # Schema adapter and dialect tests
+├── skills/
+│   └── example-skill/SKILL.md # Sample Agent Skill served over MCP
+├── docs/
+│   └── AGENT_SKILLS.md   # Skills extension discovery, trust, and packaging
 ├── dist/                 # Built output (generated)
 ├── tsconfig.json         # TypeScript configuration
 ├── vite.config.ts        # Vite build configuration
@@ -197,6 +215,7 @@ This template follows a simple architecture:
 - **HTTP Transport** - Uses Express with `createMcpHandler` (`@modelcontextprotocol/server`) for remote MCP connections
 - **Stateless** - Per the MCP 2026-07-28 spec: no session handshake or session ID; the app creates a fresh server per request and supports older clients through the SDK fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
+- **Sample Skill** - `registerSkills(server)` in `src/skills.ts` publishes `skill://example-skill/SKILL.md` through MCP resources and the `io.modelcontextprotocol/skills` extension
 - **Typed I/O** - Effect Schema `inputSchema`/`outputSchema` values adapted to MCP Standard Schema, plus `structuredContent` for typed results
 - **JSON Schema Dialects** - The adapter supports both MCP-requested `draft-07` and `draft-2020-12` output
 - **Error Handling** - Genuine tool execution failures return `isError: true` via `createErrorResult` rather than being thrown; protocol, transport, and capability failures (e.g. an unsupported elicitation) can still reject the client call

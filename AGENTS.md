@@ -23,6 +23,9 @@ npm run format:check
 # Tests
 npm run test       # interactive Vitest
 npm run test:ci    # outputs test-results.json
+
+# Confirm the sample skill is byte-identical in the npm package
+npm run verify:skill-package
 ```
 
 ## Before Submitting
@@ -30,7 +33,7 @@ npm run test:ci    # outputs test-results.json
 Always run these and fix any failures before opening a PR:
 
 ```bash
-npm run lint && npm run format:check && npm run build && npm run test:ci
+npm run lint && npm run format:check && npm run build && npm run test:ci && npm run verify:skill-package
 ```
 
 ## Project Structure
@@ -44,11 +47,17 @@ src/
   tools.test.ts  # colocated integration tests (in-memory client/server)
   config.ts      # Env var loading and validation via Effect Config
   logger.ts      # Effect structured logging
+  skills.ts      # sample Agent Skill and MCP Skills extension handlers
+  skills.test.ts # skill discovery, manifest integrity, and resource tests
   lib/
     utils.ts       # MCP response helpers (createTextResult, createErrorResult)
     mcp-schema.ts  # Effect Schema adapter for MCP Standard Schema
     utils.test.ts  # colocated unit tests
     mcp-schema.test.ts # adapter and JSON Schema dialect tests
+skills/
+  example-skill/SKILL.md # sample Agent Skill served over MCP
+docs/
+  AGENT_SKILLS.md  # Skills extension discovery, trust, and packaging
 dist/            # compiled output (ES modules)
 ```
 
@@ -58,6 +67,7 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 
 - HTTP transport via Express on `PORT` (default 3000) — **not** stdio; app wiring lives in `src/app.ts`, startup and shutdown in `src/index.ts`
 - Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/app.ts` and reused by the tests
+- The sample `example-skill` Agent Skill is registered by `registerSkills(server)` in `src/skills.ts`; it is served through normal MCP resources and the `io.modelcontextprotocol/skills` extension. Replace `skills/example-skill` the way you replace `echo`
 - Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
 - Tool workflows use `Effect` and cross the MCP callback boundary with `runMcpEffect()`
 - Effect Schemas cross the MCP boundary through `toMcpSchema()`, which supports the MCP SDK's `draft-07` and `draft-2020-12` JSON Schema targets
@@ -139,8 +149,9 @@ To build your own MCP server from this template:
 1. Update `package.json` (name, description, version). `name` and `version` are the MCP server identity unless `SERVER_NAME` or `SERVER_VERSION` is set
 2. Add/replace env vars in `src/config.ts`
 3. Replace the `echo` / `elicit_echo` tools in `src/tools.ts` with your tools
-4. Add business logic under `src/`
-5. Update `README.md` and this `AGENTS.md` to reflect your project
+4. Replace `skills/example-skill` and `SKILL_DIRECTORY_NAME` in `src/skills.ts` with your own Agent Skill. Keep the directory name and the frontmatter `name` identical
+5. Add business logic under `src/`
+6. Update `README.md` and this `AGENTS.md` to reflect your project
 
 ## Commit & PR Guidelines
 

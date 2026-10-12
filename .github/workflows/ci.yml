@@ -38,6 +38,9 @@ jobs:
       - name: Run tests
         run: npm run test:ci
 
+      - name: Verify packaged skill
+        run: npm run verify:skill-package
+
       - name: Build project
         run: npm run build
 
