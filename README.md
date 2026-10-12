@@ -139,7 +139,7 @@ Both tools declare an `outputSchema` and return `structuredContent` alongside th
 
 The template bundles an [example Agent Skill](skills/example-server/SKILL.md) that tells a client how to use `echo` and `elicit_echo`, and how to replace that guidance. On protocol revision `2026-07-28` or later, `server/discover` advertises `io.modelcontextprotocol/skills`. Clients that support the extension call `skills/list` or `skills/get` for `skill://example-server/SKILL.md`, then read the same bytes with `resources/read`. The listing includes a file manifest with SHA-256 digests and byte sizes, plus `ttlMs` and `cacheScope` freshness hints. Directory reads are left unimplemented.
 
-Add another skill by creating `skills/<name>/SKILL.md` whose frontmatter `name` matches `<name>`. The server publishes every immediate child of `skills/`. Coding skills in `.agents/skills/` stay local to this repository and are separate from the skills the running server publishes.
+Add another skill by creating `skills/<name>/SKILL.md` whose frontmatter `name` matches `<name>`. The server publishes valid, non-hidden skill directories under `skills/`. Coding skills in `.agents/skills/` stay local to this repository and are separate from the skills the running server publishes.
 
 A digest match checks that fetched bytes match the server's manifest. Reading a resource returns those bytes; the host decides whether to verify, approve, and load the skill. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
 

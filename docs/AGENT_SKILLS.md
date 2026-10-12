@@ -21,7 +21,7 @@ For protocol revision `2026-07-28` or later, `server/discover` includes:
 
 The empty extension object is intentional: this server implements the required `skills/list` and `skills/get` methods and does not implement optional `resources/directory/read`.
 
-`skills/list` returns one complete entry per immediate child of `skills/`. The example entry is `skill://example-server/SKILL.md`. `skills/get` returns that entry when given its `SKILL.md` URI, and returns `Invalid params` (`-32602`) for any other URI. Both results include `resultType: "complete"`, `ttlMs`, and `cacheScope`. Each entry's `resources` array covers every file in that skill directory, with a `sha256:{hex}` digest and raw byte size. Hidden files (names starting with `.`) are skipped.
+`skills/list` returns one complete entry per valid, non-hidden skill directory. The example entry is `skill://example-server/SKILL.md`. `skills/get` returns that entry when given its `SKILL.md` URI, and returns `Invalid params` (`-32602`) for any other URI. Both results include `resultType: "complete"`, `ttlMs`, and `cacheScope`. Each entry's `resources` array covers every file in that skill directory, with a `sha256:{hex}` digest and raw byte size. Hidden files (names starting with `.`) are skipped.
 
 The `skills/list` handler does not accept a `cursor`. It always returns the full catalog in a single page with no `nextCursor`, and a request that supplies a defined `cursor` is rejected with `Invalid params` (`-32602`). Real cursor pagination is future work for when the catalog no longer fits in one response. An entry stays atomic: a skill's `resources` set is never split across pages.
 
@@ -47,7 +47,7 @@ Skills ship with the server source and container image. There is no independent 
 4. Put supporting files in that directory when the workflow needs them.
 5. Remove `skills/example-server/` when it no longer describes the server.
 
-Startup reads `skills/` once and fails if a directory is missing `SKILL.md`, the frontmatter is invalid, `name` disagrees with the directory, or the skill exceeds 512 files or 16 MiB. The catalog is static for the life of the process. Publish a new build to change it.
+Startup reads `skills/` once and fails if a directory is missing `SKILL.md`, the frontmatter is invalid, `name` disagrees with the directory, a text file is not valid UTF-8, or the skill exceeds 512 files or 16 MiB. The catalog is static for the life of the process. Publish a new build to change it.
 
 ## Client compatibility
 

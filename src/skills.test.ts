@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -226,6 +226,40 @@ describe("skills directory opt-out", () => {
       expect(getSkillsInstructions(catalog)).toBe("");
     } finally {
       rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a text skill file that is not valid UTF-8", () => {
+    const root = mkdtempSync(join(tmpdir(), "bad-utf8-skill-"));
+    const skillDir = join(root, "example-server");
+    mkdirSync(skillDir);
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: example-server\ndescription: An example skill.\n---\nBody\n",
+    );
+    writeFileSync(join(skillDir, "notes.md"), Buffer.from([0xff, 0xfe]));
+    try {
+      expect(() => loadSkillCatalog(root)).toThrow(
+        "Skill file example-server/notes.md is not valid UTF-8",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes a non-text file that is not UTF-8", () => {
+    const root = mkdtempSync(join(tmpdir(), "binary-skill-"));
+    const skillDir = join(root, "example-server");
+    mkdirSync(skillDir);
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      "---\nname: example-server\ndescription: An example skill.\n---\nBody\n",
+    );
+    writeFileSync(join(skillDir, "blob.bin"), Buffer.from([0xff, 0xfe]));
+    try {
+      expect(loadSkillCatalog(root).entries).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

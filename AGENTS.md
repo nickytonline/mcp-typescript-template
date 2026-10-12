@@ -133,7 +133,7 @@ See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full 
 
 ## Adding a Skill
 
-The running server publishes every immediate child of `skills/`. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
+The running server publishes valid, non-hidden skill directories under `skills/`. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
 
 1. Create `skills/<name>/SKILL.md` with YAML frontmatter. `name` must match `<name>`, and `description` must say what the skill does and when to use it
 2. Add supporting files in that directory when the workflow needs them. The manifest lists every non-hidden file

@@ -139,13 +139,23 @@ function collectSkillFiles(
     if (!entry.isFile()) continue;
 
     const bytes = readFileSync(path);
+    const mimeType = mimeTypeFor(relativePath);
+    const text = bytes.toString("utf8");
+    if (
+      mimeType !== "application/octet-stream" &&
+      !Buffer.from(text, "utf8").equals(bytes)
+    ) {
+      throw new Error(
+        `Skill file ${skillName}/${relativePath} is not valid UTF-8`,
+      );
+    }
     files.push({
       skillName,
       relativePath,
       uri: skillUri(skillName, relativePath),
       bytes,
-      text: bytes.toString("utf8"),
-      mimeType: mimeTypeFor(relativePath),
+      text,
+      mimeType,
     });
   }
   return files;
