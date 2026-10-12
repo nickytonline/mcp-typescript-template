@@ -12,11 +12,11 @@
     "test": "vitest",
     "test:ci": "vitest run --reporter=json --outputFile=test-results.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts",
-    "verify:skill-package": "node scripts/verify-skill-package.mjs"
+    "lint": "eslint src/ scripts/",
+    "lint:fix": "eslint src/ scripts/ --fix",
+    "format": "prettier --write src/**/*.ts scripts/**/*.mts",
+    "format:check": "prettier --check src/**/*.ts scripts/**/*.mts",
+    "verify:skill-package": "node scripts/verify-skill-package.mts"
   },
   "keywords": [
     "mcp",

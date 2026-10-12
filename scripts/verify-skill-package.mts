@@ -1,11 +1,22 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  type Dirent,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-function collectFiles(directory, files = []) {
-  for (const entry of readdirSync(directory, { withFileTypes: true }).sort(
-    (left, right) => left.name.localeCompare(right.name),
+type NpmPackEntry = {
+  filename: string;
+};
+
+function collectFiles(directory: string, files: string[] = []): string[] {
+  const entries: Dirent[] = readdirSync(directory, { withFileTypes: true });
+  for (const entry of entries.sort((left: Dirent, right: Dirent) =>
+    left.name.localeCompare(right.name),
   )) {
     if (entry.name.startsWith(".")) continue;
     const path = join(directory, entry.name);
@@ -16,6 +27,23 @@ function collectFiles(directory, files = []) {
     if (entry.isFile()) files.push(path);
   }
   return files;
+}
+
+function isNpmPackEntry(value: unknown): value is NpmPackEntry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "filename" in value &&
+    typeof value.filename === "string"
+  );
+}
+
+function readPackFilename(output: string): string {
+  const metadata: unknown = JSON.parse(output);
+  if (!Array.isArray(metadata) || !isNpmPackEntry(metadata[0])) {
+    throw new Error("npm pack did not return a tarball filename");
+  }
+  return metadata[0].filename;
 }
 
 const sourceRoot = resolve("skills");
@@ -39,20 +67,17 @@ try {
       },
     },
   );
-  const metadata = JSON.parse(output);
-  const filename = metadata[0]?.filename;
-  if (typeof filename !== "string") {
-    throw new Error("npm pack did not return a tarball filename");
-  }
+  const filename = readPackFilename(output);
 
   for (const sourcePath of sourceFiles) {
     const skillPath = relative(resolve("."), sourcePath).split("\\").join("/");
-    const packaged = execFileSync("tar", [
+    const packaged: Buffer = execFileSync("tar", [
       "-xOf",
       join(destination, filename),
       `package/${skillPath}`,
     ]);
-    if (!readFileSync(sourcePath).equals(packaged)) {
+    const sourceBytes: Buffer = readFileSync(sourcePath);
+    if (!sourceBytes.equals(packaged)) {
       throw new Error(`${skillPath} differs between source and npm package`);
     }
     process.stdout.write(`verified ${skillPath} in ${filename}\n`);

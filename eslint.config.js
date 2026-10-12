@@ -7,7 +7,7 @@ export default [
     ignores: ['dist/**', 'node_modules/**', '*.config.js', 'coverage/**'],
   },
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.mts'],
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
