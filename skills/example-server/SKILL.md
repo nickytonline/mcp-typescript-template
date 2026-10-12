@@ -34,9 +34,9 @@ This file is the template's example, in the same way `echo` is the example tool.
 1. Add a directory under `skills/` whose name is the skill's `name`.
 2. Add `SKILL.md` with YAML frontmatter (`name` and `description`) and the workflow instructions.
 3. Add supporting files beside `SKILL.md` when the workflow needs them. The server lists every file in the skill directory in that skill's manifest.
-4. Remove `skills/example-server/` once a real skill replaces it.
+4. Remove `skills/example-server/` once a real skill replaces it. Delete every skill directory, and leave `skills/` in place, to publish none.
 
-The server publishes each immediate child directory of `skills/`. Every directory needs a `SKILL.md`, and `name` must match the directory name. Startup fails when that file is missing, the frontmatter is invalid, or the skill exceeds the extension's file limits.
+The server publishes each immediate child directory of `skills/`. A directory that exists needs a non-empty `SKILL.md`, and `name` must match the directory name. Startup fails when that file is missing, the frontmatter is invalid, or the skill exceeds the extension's file limits. With no skill directories, the server does not advertise the extension.
 
 Repository-local coding skills under `.agents/skills/` and `.claude/skills/` stay on disk for the coding agent. They are separate from the skills this server publishes.
 

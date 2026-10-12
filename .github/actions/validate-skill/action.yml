@@ -15,8 +15,8 @@ runs:
         shopt -s nullglob
         skills=(skills/*/)
         if [ ${#skills[@]} -eq 0 ]; then
-          echo "skills/ must contain at least one skill directory" >&2
-          exit 1
+          echo "No skill directories under skills/; skipping validation"
+          exit 0
         fi
         for skill in "${skills[@]}"; do
           go run github.com/skills-repos/agentskills/skills-ref/cmd/skills-ref@v0.0.1 validate "${skill%/}"

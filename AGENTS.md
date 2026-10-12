@@ -140,6 +140,8 @@ The running server publishes every immediate child of `skills/`. See [docs/AGENT
 3. Leave `src/skills.ts` unchanged unless the protocol behavior itself changes. `registerSkills()` loads the directory at startup
 4. Cover discovery, `skills/get`, and `resources/read` in `src/skills.test.ts` when you change the example or the handlers
 
+To publish no skills, delete the directories under `skills/` and leave `skills/` itself. The server then does not advertise the extension, and the image build does not require a `SKILL.md`. Deleting `skills/` entirely also requires removing `COPY ./skills/ ./skills/` from the `Dockerfile`.
+
 ## Testing
 
 - Framework: Vitest

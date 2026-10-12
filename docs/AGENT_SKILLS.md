@@ -37,7 +37,7 @@ The example skill is advisory. It describes the template's example tools and how
 
 Skills ship with the server source and container image. There is no independent public skill SemVer in this repository. A content change ships with the server revision that contains it.
 
-`npm pack` includes `skills/`, and the container copies the same source into `/app/skills/`. `npm run verify:skill-package` compares those packaged bytes with the repository. The Docker build fails when `skills/` contains no `SKILL.md`. `ttlMs` and `cacheScope: "public"` are freshness hints for the static catalog. They are hints about when to re-check, and integrity still comes from comparing bytes with the manifest. Clients should refresh `skills/get` when the hint expires or when a user asks for a recheck.
+`npm pack` includes `skills/`, and the container copies the same source into `/app/skills/`. `npm run verify:skill-package` compares those packaged bytes with the repository. A skill directory opts the project into Agent Skills: the image build then requires a non-empty `SKILL.md` in that directory. With no skill directories, the server does not advertise the extension and the image build succeeds. Leave the `skills/` directory in place, including `skills/.gitkeep`, so `COPY ./skills/` still has a source. Deleting `skills/` itself also requires removing that `COPY` line from the `Dockerfile`. `ttlMs` and `cacheScope: "public"` are freshness hints for the static catalog. They are hints about when to re-check, and integrity still comes from comparing bytes with the manifest. Clients should refresh `skills/get` when the hint expires or when a user asks for a recheck.
 
 ## Adding a skill
 

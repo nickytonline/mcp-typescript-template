@@ -46,10 +46,29 @@ function readPackFilename(output: string): string {
   return metadata[0].filename;
 }
 
+function isMissingDirectory(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+function bundledSkillFiles(directory: string): string[] {
+  try {
+    return collectFiles(directory);
+  } catch (error) {
+    if (isMissingDirectory(error)) return [];
+    throw error;
+  }
+}
+
 const sourceRoot = resolve("skills");
-const sourceFiles = collectFiles(sourceRoot);
+const sourceFiles = bundledSkillFiles(sourceRoot);
 if (sourceFiles.length === 0) {
-  throw new Error("skills/ must contain the bundled Agent Skill files");
+  process.stdout.write("no bundled skills to verify\n");
+  process.exit(0);
 }
 
 const destination = mkdtempSync(join(tmpdir(), "mcp-template-package-"));

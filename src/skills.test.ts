@@ -1,8 +1,12 @@
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import {
   getSkillsInstructions,
+  loadSkillCatalog,
   parseFrontmatter,
   registerSkills,
 } from "./skills.ts";
@@ -35,10 +39,11 @@ afterEach(async () => {
 async function request(
   method: string,
   params: Record<string, unknown> = {},
+  target: NonNullable<typeof handler> | undefined = handler,
 ): Promise<JsonRpcResponse> {
-  if (!handler) throw new Error("test handler is not initialized");
+  if (!target) throw new Error("test handler is not initialized");
 
-  const response = await handler.fetch(
+  const response = await target.fetch(
     new Request("http://localhost/mcp", {
       method: "POST",
       headers: {
@@ -205,5 +210,42 @@ describe("parseFrontmatter", () => {
     expect(() => parseFrontmatter("---\nname: example-server\n")).toThrow(
       "Skill SKILL.md has no closing YAML frontmatter marker",
     );
+  });
+});
+
+describe("skills directory opt-out", () => {
+  it("treats a missing or empty skills directory as no published skills", () => {
+    const missing = loadSkillCatalog(join(tmpdir(), "skills-do-not-exist"));
+    expect(missing.entries).toEqual([]);
+    expect(getSkillsInstructions(missing)).toBe("");
+
+    const empty = mkdtempSync(join(tmpdir(), "empty-skills-"));
+    try {
+      const catalog = loadSkillCatalog(empty);
+      expect(catalog.entries).toEqual([]);
+      expect(getSkillsInstructions(catalog)).toBe("");
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it("does not advertise the extension when no skill directories exist", async () => {
+    const empty = loadSkillCatalog(join(tmpdir(), "skills-do-not-exist"));
+    const optedOut = createMcpHandler(() => {
+      const server = new McpServer({ name: "test", version: "0.0.0" });
+      registerSkills(server, empty);
+      return server;
+    });
+
+    try {
+      const payload = await request("server/discover", {}, optedOut);
+      expect(payload.error).toBeUndefined();
+      expect(payload.result?.instructions).toBeUndefined();
+      expect(payload.result?.capabilities).not.toMatchObject({
+        extensions: { "io.modelcontextprotocol/skills": {} },
+      });
+    } finally {
+      await optedOut.close();
+    }
   });
 });

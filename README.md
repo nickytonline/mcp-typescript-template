@@ -147,7 +147,7 @@ A digest match checks that fetched bytes match the server's manifest. Reading a 
 
 1. **Update package.json** - Change `name`, `version`, description, and keywords. The MCP server name and version are read from `name` and `version` unless `SERVER_NAME` or `SERVER_VERSION` is set
 2. **Modify src/tools.ts** - Replace the `echo` / `elicit_echo` tools with your custom tools
-3. **Replace skills/example-server** - Add your own `skills/<name>/SKILL.md` and remove the example once it no longer describes the server
+3. **Replace skills/example-server** - Add your own `skills/<name>/SKILL.md` and remove the example once it no longer describes the server. Delete every skill directory, leaving `skills/` in place, to publish none
 4. **Add your logic** - Create additional TypeScript files for your business logic
 5. **Update README** - Document your specific MCP server functionality
 

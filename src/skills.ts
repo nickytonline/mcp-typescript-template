@@ -201,11 +201,24 @@ function loadSkill(directoryName: string, directory: string): LoadedSkill {
   };
 }
 
-function loadSkillCatalog(root: string): SkillCatalog {
+function isMissingDirectory(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
+/** Reads `skills/`. A missing or empty directory means the server publishes no skills. */
+export function loadSkillCatalog(root: string): SkillCatalog {
   let directoryEntries;
   try {
     directoryEntries = readdirSync(root, { withFileTypes: true });
   } catch (error) {
+    if (isMissingDirectory(error)) {
+      return { entries: [], files: new Map() };
+    }
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to read skills directory ${root}: ${message}`);
   }
@@ -224,9 +237,6 @@ function loadSkillCatalog(root: string): SkillCatalog {
 }
 
 const catalog = loadSkillCatalog(skillsRoot);
-const entriesByUri = new Map(
-  catalog.entries.map((entry) => [entry.uri, entry]),
-);
 const listSkillsParams = toMcpSchema(
   Schema.Struct({ cursor: Schema.optional(Schema.String) }),
 );
@@ -258,11 +268,11 @@ function readResource(file: SkillFile, uri: URL) {
  * implement the Skills extension. Reading a URI returns bytes; the host
  * decides whether to verify, approve, and load a skill.
  */
-export function getSkillsInstructions(): string {
-  const uris = catalog.entries.map((entry) => entry.uri);
-  if (uris.length === 0) {
-    return "This server supports the MCP Skills extension. Its skills directory is currently empty.";
-  }
+export function getSkillsInstructions(
+  skillCatalog: SkillCatalog = catalog,
+): string {
+  const uris = skillCatalog.entries.map((entry) => entry.uri);
+  if (uris.length === 0) return "";
 
   const listed =
     uris.length === 1
@@ -276,13 +286,22 @@ export function getSkillsInstructions(): string {
  * Publishes every skill directory under `skills/` and the stable Skills
  * extension methods. Directory reads are intentionally not advertised.
  */
-export function registerSkills(server: McpServer): void {
+export function registerSkills(
+  server: McpServer,
+  skillCatalog: SkillCatalog = catalog,
+): void {
+  if (skillCatalog.entries.length === 0) return;
+
+  const entriesByUri = new Map(
+    skillCatalog.entries.map((entry) => [entry.uri, entry]),
+  );
+
   server.server.registerCapabilities({
     resources: {},
     extensions: { "io.modelcontextprotocol/skills": {} },
   });
 
-  for (const file of catalog.files.values()) {
+  for (const file of skillCatalog.files.values()) {
     const isSkillFile = file.relativePath === "SKILL.md";
     server.registerResource(
       isSkillFile ? file.skillName : `${file.skillName}/${file.relativePath}`,
@@ -306,7 +325,7 @@ export function registerSkills(server: McpServer): void {
       }
       return {
         resultType: "complete",
-        skills: catalog.entries,
+        skills: skillCatalog.entries,
         ttlMs: CACHE_TTL_MS,
         cacheScope: "public",
       };

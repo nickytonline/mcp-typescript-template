@@ -13,7 +13,14 @@ COPY *.ts *.json ./
 COPY ./src/ ./src/
 COPY ./skills/ ./skills/
 
-RUN npm run build && find skills -type f -name SKILL.md -size +0c | grep -q .
+# A directory under skills/ opts this image into Agent Skills and must
+# contain a non-empty SKILL.md. skills/.gitkeep alone does not.
+RUN npm run build && \
+    for dir in skills/*/; do \
+      if [ -d "$dir" ]; then \
+        test -s "${dir}SKILL.md"; \
+      fi; \
+    done
 
 EXPOSE 3000
 
