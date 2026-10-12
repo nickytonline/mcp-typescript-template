@@ -19,7 +19,8 @@ runs:
           exit 0
         fi
         for skill in "${skills[@]}"; do
-          go run github.com/skills-repos/agentskills/skills-ref/cmd/skills-ref@v0.0.1 validate "${skill%/}"
+          # skills-ref v0.0.1, pinned to the commit so the tag cannot move.
+          go run github.com/skills-repos/agentskills/skills-ref/cmd/skills-ref@1d429a6bcb1fb2d01db42d37aedabc2edea46e39 validate "${skill%/}"
         done
 
     - name: Verify packaged skills
