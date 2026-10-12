@@ -39,7 +39,7 @@
     "@types/node": "^22.20.5",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
-    "@typescript-eslint/parser": "^8.49.0",
+    "@typescript-eslint/parser": "^8.71.1",
     "concurrently": "^10.0.6",
     "conventional-changelog-conventionalcommits": "^10.2.1",
     "eslint": "^10.12.0",
