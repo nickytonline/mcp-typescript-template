@@ -300,6 +300,7 @@ export function registerSkills(server: McpServer): void {
     "skills/list",
     { params: listSkillsParams },
     async ({ cursor }) => {
+      // The catalog fits in one page. Reject a defined cursor until real pagination exists.
       if (cursor !== undefined) {
         throw invalidParams("Unknown skills/list cursor");
       }

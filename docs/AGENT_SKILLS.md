@@ -23,7 +23,7 @@ The empty extension object is intentional: this server implements the required `
 
 `skills/list` returns one complete entry per immediate child of `skills/`. The example entry is `skill://example-server/SKILL.md`. `skills/get` returns that entry when given its `SKILL.md` URI, and returns `Invalid params` (`-32602`) for any other URI. Both results include `resultType: "complete"`, `ttlMs`, and `cacheScope`. Each entry's `resources` array covers every file in that skill directory, with a `sha256:{hex}` digest and raw byte size. Hidden files (names starting with `.`) are skipped.
 
-`skills/list` accepts a `cursor` parameter and rejects any defined cursor with `Invalid params`. The handler returns the full catalog in one page and omits `nextCursor`. Add real cursor pagination when a catalog no longer fits in one response. An entry is atomic: a skill's `resources` set stays on a single page.
+The `skills/list` handler does not accept a `cursor`. It always returns the full catalog in a single page with no `nextCursor`, and a request that supplies a defined `cursor` is rejected with `Invalid params` (`-32602`). Real cursor pagination is future work for when the catalog no longer fits in one response. An entry stays atomic: a skill's `resources` set is never split across pages.
 
 Skill files are ordinary MCP resources and are read with `resources/read`. `SKILL.md` is `text/markdown`. Other files use a MIME type derived from their extension, or `application/octet-stream`. The server instructions include the skill URIs as a fallback for clients that do not implement the Skills extension.
 
