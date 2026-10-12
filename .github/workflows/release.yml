@@ -37,6 +37,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Validate Agent Skills
+        uses: ./.github/actions/validate-skill
+
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

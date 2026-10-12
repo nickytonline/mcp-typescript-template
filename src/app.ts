@@ -5,16 +5,21 @@ import { Effect } from "effect";
 import { logger } from "./logger.ts";
 import { getConfig } from "./config.ts";
 import { registerTools } from "./tools.ts";
+import { getSkillsInstructions, registerSkills } from "./skills.ts";
 import { runMcpEffect } from "./lib/utils.ts";
 
 const getServer = () => {
   const config = getConfig();
-  const server = new McpServer({
-    name: config.SERVER_NAME,
-    version: config.SERVER_VERSION,
-  });
+  const server = new McpServer(
+    {
+      name: config.SERVER_NAME,
+      version: config.SERVER_VERSION,
+    },
+    { instructions: getSkillsInstructions() },
+  );
 
   registerTools(server);
+  registerSkills(server);
 
   return server;
 };
@@ -26,7 +31,9 @@ export function createApp() {
   // 2025-era clients automatically via a stateless per-request fallback.
   const handler = createMcpHandler(getServer, {
     onerror: (error) => {
-      void runMcpEffect(logger.error({ error: error.message }, "Error handling MCP request"));
+      void runMcpEffect(
+        logger.error({ error: error.message }, "Error handling MCP request"),
+      );
     },
   });
 

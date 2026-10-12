@@ -11,8 +11,9 @@ RUN npm ci --prefer-offline
 
 COPY *.ts *.json ./
 COPY ./src/ ./src/
+COPY ./skills/ ./skills/
 
-RUN npm run build
+RUN npm run build && find skills -type f -name SKILL.md -size +0c | grep -q .
 
 EXPOSE 3000
 

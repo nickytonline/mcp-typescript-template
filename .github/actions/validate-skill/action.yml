@@ -1,0 +1,27 @@
+name: Validate Agent Skills
+description: Validate each bundled Agent Skill and verify the npm package contains the same bytes.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: "1.26.x"
+
+    - name: Validate Agent Skills
+      shell: bash
+      run: |
+        shopt -s nullglob
+        skills=(skills/*/)
+        if [ ${#skills[@]} -eq 0 ]; then
+          echo "skills/ must contain at least one skill directory" >&2
+          exit 1
+        fi
+        for skill in "${skills[@]}"; do
+          go run github.com/skills-repos/agentskills/skills-ref/cmd/skills-ref@v0.0.1 validate "${skill%/}"
+        done
+
+    - name: Verify packaged skills
+      shell: bash
+      run: npm run verify:skill-package
