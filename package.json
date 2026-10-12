@@ -12,10 +12,11 @@
     "test": "vitest",
     "test:ci": "vitest run --reporter=json --outputFile=test-results.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/**/*.ts",
-    "format:check": "prettier --check src/**/*.ts"
+    "lint": "eslint src/ scripts/",
+    "lint:fix": "eslint src/ scripts/ --fix",
+    "format": "prettier --write src/**/*.ts scripts/**/*.mts",
+    "format:check": "prettier --check src/**/*.ts scripts/**/*.mts",
+    "verify:skill-package": "node scripts/verify-skill-package.mts"
   },
   "keywords": [
     "mcp",
@@ -54,6 +55,7 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@types/express": "^5.0.6",
     "effect": "^3.22.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "yaml": "^2.9.1"
   }
 }

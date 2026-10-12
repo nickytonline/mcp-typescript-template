@@ -1,7 +1,12 @@
 import { createServer, type Server as HttpServer } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { createApp } from "./app.ts";
+
+const EXAMPLE_SKILL_URI = "skill://example-server/SKILL.md";
 
 type AppHarness = {
   httpServer: HttpServer;
@@ -53,10 +58,7 @@ async function setupHttpServer() {
 
 async function setupHttpClient() {
   const appHarness = await setupHttpServer();
-  const client = new Client(
-    { name: "test-client", version: "0.0.0" },
-    {},
-  );
+  const client = new Client({ name: "test-client", version: "0.0.0" }, {});
   const transport = new StreamableHTTPClientTransport(
     new URL(`${appHarness.baseUrl}/mcp`),
   );
@@ -86,6 +88,21 @@ describe("HTTP app", () => {
 
     expect(result.structuredContent).toEqual({ echo: "over HTTP" });
     expect(result.isError).toBeFalsy();
+  });
+
+  it("advertises the example skill over HTTP", async () => {
+    const { client } = await setupHttpClient();
+
+    const resources = await client.listResources();
+    expect(
+      resources.resources.some(
+        (resource) => resource.uri === EXAMPLE_SKILL_URI,
+      ),
+    ).toBe(true);
+    expect(client.getInstructions()).toContain(EXAMPLE_SKILL_URI);
+    expect(client.getServerCapabilities()?.extensions).toMatchObject({
+      "io.modelcontextprotocol/skills": {},
+    });
   });
 
   it("returns a client error for malformed JSON", async () => {

@@ -30,7 +30,7 @@ npm run test:ci    # outputs test-results.json
 Always run these and fix any failures before opening a PR:
 
 ```bash
-npm run lint && npm run format:check && npm run build && npm run test:ci
+npm run lint && npm run format:check && npm run build && npm run test:ci && npm run verify:skill-package
 ```
 
 ## Project Structure
@@ -42,6 +42,8 @@ src/
   index.ts       # Effect startup and shutdown; runs the app on PORT
   tools.ts       # registerTools() wiring + per-tool logic functions
   tools.test.ts  # colocated integration tests (in-memory client/server)
+  skills.ts      # bundled Agent Skills and MCP Skills extension handlers
+  skills.test.ts # skill discovery, manifest integrity, and resource tests
   config.ts      # Env var loading and validation via Effect Config
   logger.ts      # Effect structured logging
   lib/
@@ -49,6 +51,10 @@ src/
     mcp-schema.ts  # Effect Schema adapter for MCP Standard Schema
     utils.test.ts  # colocated unit tests
     mcp-schema.test.ts # adapter and JSON Schema dialect tests
+skills/
+  example-server/SKILL.md # example Agent Skill published by the running server
+docs/
+  AGENT_SKILLS.md # discovery, security, packaging, and client compatibility
 dist/            # compiled output (ES modules)
 ```
 
@@ -58,6 +64,7 @@ Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile
 
 - HTTP transport via Express on `PORT` (default 3000) — **not** stdio; app wiring lives in `src/app.ts`, startup and shutdown in `src/index.ts`
 - Tools registered via `registerTools(server)` in `src/tools.ts`, the single source of truth for tool wiring — called from `getServer()` in `src/app.ts` and reused by the tests
+- Agent Skills under `skills/` are registered by `registerSkills(server)` in `src/skills.ts` and served through MCP resources plus the `io.modelcontextprotocol/skills` extension. Coding skills in `.agents/skills/` are for agents editing this repository and are separate from that catalog
 - Tool responses use `createTextResult` / `createErrorResult` from `src/lib/utils.ts`: a text `content` block plus `structuredContent` (for clients that declare an `outputSchema`)
 - Tool workflows use `Effect` and cross the MCP callback boundary with `runMcpEffect()`
 - Effect Schemas cross the MCP boundary through `toMcpSchema()`, which supports the MCP SDK's `draft-07` and `draft-2020-12` JSON Schema targets
@@ -123,6 +130,17 @@ See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full 
 8. Log with `yield* logger.error({ toolName, requestId, error: error.message }, "Tool execution failed")` on failure — omit the raw `args` object (see Logging)
 9. If the tool needs user input mid-call, return `inputRequired({ inputRequests: {...} })` (see `elicit_echo` in `src/tools.ts`) — the older synchronous `elicitInput()` push request throws on a 2026-07-28-era connection
 10. Add integration tests to `src/tools.test.ts` (import `registerTools`, wire an in-memory client/server)
+
+## Adding a Skill
+
+The running server publishes valid, non-hidden skill directories under `skills/`. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
+
+1. Create `skills/<name>/SKILL.md` with YAML frontmatter. `name` must match `<name>`, and `description` must say what the skill does and when to use it
+2. Add supporting files in that directory when the workflow needs them. The manifest lists every non-hidden file
+3. Leave `src/skills.ts` unchanged unless the protocol behavior itself changes. `registerSkills()` loads the directory at startup
+4. Cover discovery, `skills/get`, and `resources/read` in `src/skills.test.ts` when you change the example or the handlers
+
+To publish no skills, delete the directories under `skills/` and leave `skills/` itself. The server then does not advertise the extension, and the image build does not require a `SKILL.md`. Deleting `skills/` entirely also requires removing `COPY ./skills/ ./skills/` from the `Dockerfile`.
 
 ## Testing
 

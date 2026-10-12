@@ -13,6 +13,7 @@ This template provides:
 - **ESLint + Prettier** - Code quality and formatting
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
+- **Example Agent Skill** - `example-server` published through the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)
 
 ## Getting Started
 
@@ -134,12 +135,21 @@ Demonstrates [MCP elicitation](https://modelcontextprotocol.io/specification/202
 
 Both tools declare an `outputSchema` and return `structuredContent` alongside the text result, and carry `annotations` (`readOnlyHint`, `idempotentHint`, `openWorldHint`) describing their safety profile.
 
+## Agent skill
+
+The template bundles an [example Agent Skill](skills/example-server/SKILL.md) that tells a client how to use `echo` and `elicit_echo`, and how to replace that guidance. On protocol revision `2026-07-28` or later, `server/discover` advertises `io.modelcontextprotocol/skills`. Clients that support the extension call `skills/list` or `skills/get` for `skill://example-server/SKILL.md`, then read the same bytes with `resources/read`. The listing includes a file manifest with SHA-256 digests and byte sizes, plus `ttlMs` and `cacheScope` freshness hints. Directory reads are left unimplemented.
+
+Add another skill by creating `skills/<name>/SKILL.md` whose frontmatter `name` matches `<name>`. The server publishes valid, non-hidden skill directories under `skills/`. Coding skills in `.agents/skills/` stay local to this repository and are separate from the skills the running server publishes.
+
+A digest match checks that fetched bytes match the server's manifest. Reading a resource returns those bytes; the host decides whether to verify, approve, and load the skill. See [docs/AGENT_SKILLS.md](docs/AGENT_SKILLS.md).
+
 ## Customizing Your MCP Server
 
 1. **Update package.json** - Change `name`, `version`, description, and keywords. The MCP server name and version are read from `name` and `version` unless `SERVER_NAME` or `SERVER_VERSION` is set
 2. **Modify src/tools.ts** - Replace the `echo` / `elicit_echo` tools with your custom tools
-3. **Add your logic** - Create additional TypeScript files for your business logic
-4. **Update README** - Document your specific MCP server functionality
+3. **Replace skills/example-server** - Add your own `skills/<name>/SKILL.md` and remove the example once it no longer describes the server. Delete every skill directory, leaving `skills/` in place, to publish none
+4. **Add your logic** - Create additional TypeScript files for your business logic
+5. **Update README** - Document your specific MCP server functionality
 
 ## Docker
 
@@ -175,6 +185,8 @@ mcp-typescript-template/
 │   ├── index.ts          # Effect startup and shutdown
 │   ├── tools.ts          # Tool registration (registerTools) and logic
 │   ├── tools.test.ts     # Integration tests (in-memory client/server)
+│   ├── skills.ts         # Bundled Agent Skills and MCP Skills extension
+│   ├── skills.test.ts    # Skill discovery, manifest, and resource tests
 │   ├── config.ts         # Env var loading and validation (Effect Config)
 │   ├── logger.ts         # Effect structured logging
 │   └── lib/
@@ -182,6 +194,9 @@ mcp-typescript-template/
 │       ├── mcp-schema.ts  # Effect Schema → MCP Standard Schema adapter
 │       ├── utils.test.ts # Unit tests
 │       └── mcp-schema.test.ts # Schema adapter and dialect tests
+├── skills/
+│   └── example-server/SKILL.md  # Example Agent Skill published by the server
+├── docs/AGENT_SKILLS.md  # Discovery, security, packaging, and compatibility
 ├── dist/                 # Built output (generated)
 ├── tsconfig.json         # TypeScript configuration
 ├── vite.config.ts        # Vite build configuration
@@ -197,6 +212,7 @@ This template follows a simple architecture:
 - **HTTP Transport** - Uses Express with `createMcpHandler` (`@modelcontextprotocol/server`) for remote MCP connections
 - **Stateless** - Per the MCP 2026-07-28 spec: no session handshake or session ID; the app creates a fresh server per request and supports older clients through the SDK fallback
 - **Tool Registration** - `registerTools(server)` in `src/tools.ts` is the single source of truth for tool wiring; `getServer()` and the tests both use it
+- **Agent Skills** - `registerSkills(server)` in `src/skills.ts` publishes `skills/` through MCP resources and the `io.modelcontextprotocol/skills` extension
 - **Typed I/O** - Effect Schema `inputSchema`/`outputSchema` values adapted to MCP Standard Schema, plus `structuredContent` for typed results
 - **JSON Schema Dialects** - The adapter supports both MCP-requested `draft-07` and `draft-2020-12` output
 - **Error Handling** - Genuine tool execution failures return `isError: true` via `createErrorResult` rather than being thrown; protocol, transport, and capability failures (e.g. an unsupported elicitation) can still reject the client call
