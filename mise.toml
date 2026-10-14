@@ -1,0 +1,5 @@
+# Node 24 for mise. Vite+ does not read this file.
+# The project-local `vp` binary uses whatever Node is already on PATH.
+# Current Node 24 releases satisfy Vite+'s ^24.11 floor.
+[tools]
+node = "24"

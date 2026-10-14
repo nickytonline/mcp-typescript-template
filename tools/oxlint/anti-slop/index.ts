@@ -1,4 +1,4 @@
-import { eslintCompatPlugin } from "@oxlint/plugins";
+import { eslintCompatPlugin } from "vite-plus/lint/plugins";
 
 import { noArrayFilterMapRule } from "./rules/no-array-filter-map.ts";
 import { noReduceAccumulatorCopyRule } from "./rules/no-reduce-accumulator-copy.ts";

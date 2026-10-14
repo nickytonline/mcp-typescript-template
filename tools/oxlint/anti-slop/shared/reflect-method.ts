@@ -1,6 +1,6 @@
 import { resolveVariable } from "./scope.ts";
 
-import type { ESTree, SourceCode } from "@oxlint/plugins";
+import type { ESTree, SourceCode } from "vite-plus/lint/plugins";
 
 function isGlobalReflect(sourceCode: SourceCode, expression: ESTree.Expression): boolean {
   if (expression.type !== "Identifier" || expression.name !== "Reflect") return false;

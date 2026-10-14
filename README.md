@@ -8,9 +8,9 @@ This template provides:
 
 - **TypeScript 7** - Native compiler with strict configuration; TypeScript 6 remains available as `tsc6`
 - **Effect** - Typed configuration, validation, logging, error handling, and async workflows
-- **Vite** - Fast build system with ES modules output
+- **Vite+** - Build, test, lint, and format through the `vp` CLI (Vite, Vitest, Oxlint, and Oxfmt). npm script names stay the same
 - **Express** - Fast, unopinionated web framework for HTTP server
-- **Oxlint + Oxfmt** - Code quality and formatting, including vendored anti-slop rules
+- **Oxlint anti-slop rules** - Vendored custom plugins in `tools/oxlint/anti-slop`, loaded by Vite+
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
 - **Example Agent Skill** - `example-server` published through the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)
@@ -56,6 +56,10 @@ npm install
 ```
 
 ## Development
+
+Node.js 24.11 or newer. Vite+ does not run on earlier Node 24 releases. `npm start` still runs `node dist/index.js`, and the bundle target stays Node 24.
+
+[mise](https://mise.jdx.dev/) users get that runtime from `mise.toml` (`node = "24"`). Vite+ does not read `mise.toml`. The project-local `vp` binary uses the Node already on PATH; a global `vp` install is not required.
 
 ### Type checking
 
@@ -110,6 +114,7 @@ npx @modelcontextprotocol/inspector
 ```
 
 This will launch a web interface that allows you to:
+
 - Connect to your MCP server
 - Test your tools interactively
 - View request/response messages
@@ -199,9 +204,8 @@ mcp-typescript-template/
 ├── docs/AGENT_SKILLS.md  # Discovery, security, packaging, and compatibility
 ├── dist/                 # Built output (generated)
 ├── tsconfig.json         # TypeScript configuration
-├── vite.config.ts        # Vite build configuration
-├── .oxlintrc.json        # Oxlint configuration
-├── .oxfmtrc.json         # Oxfmt configuration (Prettier-compatible)
+├── vite.config.ts        # Vite+ build, lint, and format configuration
+├── mise.toml             # Node 24 pin for mise
 ├── Dockerfile            # Docker configuration
 └── package.json          # Dependencies and scripts
 ```
@@ -224,7 +228,10 @@ This template follows a simple architecture:
 Add the registration inside `registerTools()` in `src/tools.ts`. See the `create-mcp-tool` skill (`.agents/skills/create-mcp-tool`) for the full walkthrough.
 
 ```typescript
-import type { CallToolResult, ServerContext } from "@modelcontextprotocol/server";
+import type {
+  CallToolResult,
+  ServerContext,
+} from "@modelcontextprotocol/server";
 import { Effect, Schema } from "effect";
 import { toMcpSchema } from "./lib/mcp-schema.ts";
 import { createTextResult, runMcpEffect } from "./lib/utils.ts";

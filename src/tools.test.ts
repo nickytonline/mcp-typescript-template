@@ -1,5 +1,5 @@
 import { ParseResult } from "effect";
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vite-plus/test";
 import {
   Client,
   StreamableHTTPClientTransport,

@@ -1,4 +1,4 @@
-import type { ESTree } from "@oxlint/plugins";
+import type { ESTree } from "vite-plus/lint/plugins";
 
 import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts";
 

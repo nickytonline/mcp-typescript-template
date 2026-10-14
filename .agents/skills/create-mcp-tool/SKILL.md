@@ -207,7 +207,7 @@ Add tests to `src/tools.test.ts`, colocated with `src/tools.ts`. Tests use `InMe
 Follow the existing pattern:
 
 ```typescript
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vite-plus/test";
 import { Client } from "@modelcontextprotocol/client";
 import { McpServer, InMemoryTransport, type CallToolResult } from "@modelcontextprotocol/server";
 import { registerTools } from "./tools.ts";
@@ -284,9 +284,9 @@ npm run test
 
 ```bash
 npm run build        # compile TypeScript
-npm run lint         # Oxlint
-npm run format:check # Oxfmt formatting check
-npm run test:ci      # Vitest (non-interactive, outputs test-results.json)
+npm run lint         # Oxlint via Vite+
+npm run format:check # Oxfmt via Vite+
+npm run test:ci      # Vitest via Vite+ (non-interactive, outputs test-results.json)
 npm run dev          # start server with hot reload for manual testing
 ```
 

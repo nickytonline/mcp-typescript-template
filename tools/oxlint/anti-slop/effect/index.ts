@@ -1,4 +1,4 @@
-import { eslintCompatPlugin } from "@oxlint/plugins";
+import { eslintCompatPlugin } from "vite-plus/lint/plugins";
 
 import { noManualEffectErrorTagRule } from "./rules/no-manual-effect-error-tag.ts";
 import { noManualTagComparisonRule } from "./rules/no-manual-tag-comparison.ts";

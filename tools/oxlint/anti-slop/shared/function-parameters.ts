@@ -1,4 +1,4 @@
-import type { ESTree, SourceCode } from "@oxlint/plugins";
+import type { ESTree, SourceCode } from "vite-plus/lint/plugins";
 
 export type FunctionParameter = ESTree.ParamPattern;
 
