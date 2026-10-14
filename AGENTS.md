@@ -58,7 +58,7 @@ docs/
 dist/            # compiled output (ES modules)
 ```
 
-Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `Dockerfile`) live at the repo root.
+Config files (`vite.config.ts`, `tsconfig.json`, `eslint.config.js`, `.oxfmtrc.json`, `Dockerfile`) live at the repo root.
 
 ## Architecture
 
@@ -96,7 +96,7 @@ Defined and validated in `src/config.ts`:
 ## Coding Conventions
 
 - TypeScript with ES module syntax (`import`/`export`)
-- Prettier defaults: 2-space indent, double quotes, trailing commas
+- Oxfmt with Prettier-compatible defaults: 2-space indent, double quotes, trailing commas
 - ESLint with `@typescript-eslint` — `any` is discouraged (warn)
 - Private class methods use `#` prefix
 - Intentionally unused params/vars: prefix with `_`

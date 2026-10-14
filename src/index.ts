@@ -49,10 +49,14 @@ const main = Effect.gen(function* () {
         Effect.matchEffect({
           onSuccess: () => Effect.sync(() => process.exit(0)),
           onFailure: (error) =>
-            logger.error(
-              { error: error instanceof Error ? error.message : String(error) },
-              "Error during graceful shutdown",
-            ).pipe(Effect.andThen(Effect.sync(() => process.exit(1)))),
+            logger
+              .error(
+                {
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                "Error during graceful shutdown",
+              )
+              .pipe(Effect.andThen(Effect.sync(() => process.exit(1)))),
         }),
       ),
     );

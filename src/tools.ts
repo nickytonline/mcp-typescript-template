@@ -7,7 +7,11 @@ import type {
 import { inputRequired, inputResponse } from "@modelcontextprotocol/server";
 import { Effect, Either, ParseResult, Schema } from "effect";
 import { toMcpSchema } from "./lib/mcp-schema.ts";
-import { createErrorResult, createTextResult, runMcpEffect } from "./lib/utils.ts";
+import {
+  createErrorResult,
+  createTextResult,
+  runMcpEffect,
+} from "./lib/utils.ts";
 import { logger } from "./logger.ts";
 
 const ELICIT_ECHO_MESSAGE_KEY = "message";
@@ -27,7 +31,9 @@ const ElicitEchoOutputSchema = toMcpSchema(
 
 const EchoInputSchema = toMcpSchema(
   Schema.Struct({
-    message: Schema.String.annotations({ description: "The message to echo back" }),
+    message: Schema.String.annotations({
+      description: "The message to echo back",
+    }),
   }),
 );
 
@@ -104,7 +110,10 @@ function elicitEcho(
   return Effect.gen(function* () {
     const toolName = "elicit_echo";
     const requestId = ctx.mcpReq.id;
-    const response = inputResponse(ctx.mcpReq.inputResponses, ELICIT_ECHO_MESSAGE_KEY);
+    const response = inputResponse(
+      ctx.mcpReq.inputResponses,
+      ELICIT_ECHO_MESSAGE_KEY,
+    );
 
     if (response.kind === "missing") {
       return inputRequired({
@@ -146,7 +155,10 @@ function elicitEcho(
         { toolName, requestId, action: "decline" },
         "User declined elicitation",
       );
-      return createTextResult({ echo: null, reason: "User declined to provide a message" });
+      return createTextResult({
+        echo: null,
+        reason: "User declined to provide a message",
+      });
     }
 
     if (response.action === "cancel") {
@@ -154,7 +166,10 @@ function elicitEcho(
         { toolName, requestId, action: "cancel" },
         "User cancelled elicitation",
       );
-      return createTextResult({ echo: null, reason: "Elicitation was cancelled" });
+      return createTextResult({
+        echo: null,
+        reason: "Elicitation was cancelled",
+      });
     }
 
     const accepted = ParseResult.decodeUnknownEither(AcceptedElicitationSchema)(
@@ -165,7 +180,9 @@ function elicitEcho(
         { toolName, requestId },
         "Accept response missing content",
       );
-      return createErrorResult({ error: "Accepted but no content was returned" });
+      return createErrorResult({
+        error: "Accepted but no content was returned",
+      });
     }
 
     yield* logger.info({ toolName, requestId }, "Tool executed");

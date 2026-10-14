@@ -10,7 +10,7 @@ This template provides:
 - **Effect** - Typed configuration, validation, logging, error handling, and async workflows
 - **Vite** - Fast build system with ES modules output
 - **Express** - Fast, unopinionated web framework for HTTP server
-- **ESLint + Prettier** - Code quality and formatting
+- **ESLint + Oxfmt** - Code quality and formatting
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
 - **Example Agent Skill** - `example-server` published through the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)
@@ -201,6 +201,7 @@ mcp-typescript-template/
 ├── tsconfig.json         # TypeScript configuration
 ├── vite.config.ts        # Vite build configuration
 ├── eslint.config.js      # ESLint configuration
+├── .oxfmtrc.json         # Oxfmt configuration (Prettier-compatible)
 ├── Dockerfile            # Docker configuration
 └── package.json          # Dependencies and scripts
 ```

@@ -1,5 +1,8 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import {
   McpServer,
   InMemoryTransport,
@@ -53,7 +56,8 @@ async function setupClientServer(options: SetupOptions = {}) {
   const server = new McpServer({ name: "test-server", version: "0.0.0" });
   registerTools(server);
 
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
 
   const client = new Client(
     { name: "test-client", version: "0.0.0" },
@@ -61,9 +65,12 @@ async function setupClientServer(options: SetupOptions = {}) {
   );
 
   if (elicitHandler) {
-    client.setRequestHandler("elicitation/create", async (request: ElicitRequest) => {
-      return elicitHandler({ message: request.params.message });
-    });
+    client.setRequestHandler(
+      "elicitation/create",
+      async (request: ElicitRequest) => {
+        return elicitHandler({ message: request.params.message });
+      },
+    );
   }
 
   await server.connect(serverTransport);
@@ -218,16 +225,21 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
    * wire format this migration introduces, not just against the tool
    * function in isolation.
    */
-  async function setupModernEraClient(options: { supportsElicitation?: boolean } = {}) {
+  async function setupModernEraClient(
+    options: { supportsElicitation?: boolean } = {},
+  ) {
     const { supportsElicitation = true } = options;
 
     const server = new McpServer({ name: "test-server", version: "0.0.0" });
     registerTools(server);
 
     const handler = createMcpHandler(() => server);
-    const transport = new StreamableHTTPClientTransport(new URL("http://localhost/mcp"), {
-      fetch: async (input, init) => handler.fetch(new Request(input, init)),
-    });
+    const transport = new StreamableHTTPClientTransport(
+      new URL("http://localhost/mcp"),
+      {
+        fetch: async (input, init) => handler.fetch(new Request(input, init)),
+      },
+    );
 
     const client = new Client(
       { name: "test-client", version: "0.0.0" },
@@ -250,7 +262,10 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
       content: { message: "modern era hello" },
     }));
 
-    const result = await client.callTool({ name: "elicit_echo", arguments: {} });
+    const result = await client.callTool({
+      name: "elicit_echo",
+      arguments: {},
+    });
 
     const parsed = parseContent(result);
     expect(parsed.echo).toBe("modern era hello");
@@ -261,9 +276,13 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
   });
 
   it("rejects the tool call when the client does not support elicitation", async () => {
-    const { client, handler } = await setupModernEraClient({ supportsElicitation: false });
+    const { client, handler } = await setupModernEraClient({
+      supportsElicitation: false,
+    });
 
-    await expect(client.callTool({ name: "elicit_echo", arguments: {} })).rejects.toThrow(/elicitation/i);
+    await expect(
+      client.callTool({ name: "elicit_echo", arguments: {} }),
+    ).rejects.toThrow(/elicitation/i);
 
     await client.close();
     await handler.close();
