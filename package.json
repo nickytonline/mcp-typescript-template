@@ -31,7 +31,7 @@
     "node": ">=24.0.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.2",
+    "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.0",
     "@modelcontextprotocol/client": "^2.2.0",
     "@oxlint/plugins": "1.88.0",
