@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
+import { ParseResult, Schema } from "effect";
+import { JsonObjectSchema, type JsonObject } from "./lib/json.ts";
 import {
   getSkillsInstructions,
   loadSkillCatalog,
@@ -12,10 +14,56 @@ import {
 } from "./skills.ts";
 
 const EXAMPLE_SKILL_URI = "skill://example-server/SKILL.md";
+const ignoreExcess = { onExcessProperty: "ignore" } as const;
+
+const JsonRpcResponseSchema = Schema.Struct({
+  result: Schema.optional(JsonObjectSchema),
+  error: Schema.optional(
+    Schema.Struct({
+      code: Schema.Number,
+      message: Schema.String,
+    }),
+  ),
+});
+
+const SkillListResult = Schema.Struct({
+  resultType: Schema.String,
+  skills: Schema.Array(
+    Schema.Struct({
+      uri: Schema.String,
+      frontmatter: Schema.Struct({
+        name: Schema.String,
+        description: Schema.String,
+      }),
+      resources: Schema.Array(
+        Schema.Struct({
+          uri: Schema.String,
+          digest: Schema.String,
+          size: Schema.Number,
+        }),
+      ),
+    }),
+  ),
+  ttlMs: Schema.Number,
+  cacheScope: Schema.String,
+});
+
+const ResourceReadResult = Schema.Struct({
+  contents: Schema.Array(
+    Schema.Struct({
+      text: Schema.String,
+    }),
+  ),
+});
 
 type JsonRpcResponse = {
-  result?: Record<string, unknown>;
-  error?: { code: number; message: string };
+  readonly result?: JsonObject;
+  readonly error?: { readonly code: number; readonly message: string };
+};
+
+type SkillRequestParams = {
+  readonly uri?: string;
+  readonly cursor?: string;
 };
 
 let handler: ReturnType<typeof createMcpHandler> | undefined;
@@ -26,7 +74,9 @@ beforeEach(() => {
       { name: "test", version: "0.0.0" },
       { instructions: getSkillsInstructions() },
     );
+
     registerSkills(server);
+
     return server;
   });
 });
@@ -38,21 +88,26 @@ afterEach(async () => {
 
 async function request(
   method: string,
-  params: Record<string, unknown> = {},
+  params: SkillRequestParams = {},
   target: NonNullable<typeof handler> | undefined = handler,
 ): Promise<JsonRpcResponse> {
   if (!target) throw new Error("test handler is not initialized");
 
+  const headers = new Headers({
+    accept: "application/json, text/event-stream",
+    "content-type": "application/json",
+    "mcp-method": method,
+    "mcp-protocol-version": "2026-07-28",
+  });
+
+  if (params.uri !== undefined) {
+    headers.set("mcp-name", params.uri);
+  }
+
   const response = await target.fetch(
     new Request("http://localhost/mcp", {
       method: "POST",
-      headers: {
-        accept: "application/json, text/event-stream",
-        "content-type": "application/json",
-        "mcp-method": method,
-        "mcp-protocol-version": "2026-07-28",
-        ...(typeof params.uri === "string" ? { "mcp-name": params.uri } : {}),
-      },
+      headers,
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -73,12 +128,23 @@ async function request(
   );
 
   const body = await response.text();
-  if (response.headers.get("content-type")?.includes("text/event-stream")) {
-    const dataLine = body.split("\n").find((line) => line.startsWith("data:"));
-    if (!dataLine) throw new Error(`Missing SSE data in ${body}`);
-    return JSON.parse(dataLine.slice("data:".length).trim()) as JsonRpcResponse;
-  }
-  return JSON.parse(body) as JsonRpcResponse;
+
+  const payload = response.headers
+    .get("content-type")
+    ?.includes("text/event-stream")
+    ? body
+        .split("\n")
+        .find((line) => line.startsWith("data:"))
+        ?.slice("data:".length)
+        .trim()
+    : body;
+
+  if (!payload) throw new Error(`Missing SSE data in ${body}`);
+
+  return ParseResult.decodeUnknownSync(
+    JsonRpcResponseSchema,
+    ignoreExcess,
+  )(JSON.parse(payload));
 }
 
 describe("example skill extension", () => {
@@ -97,16 +163,11 @@ describe("example skill extension", () => {
 
   it("lists a complete manifest, gets it by URI, and reads the skill resource", async () => {
     const listResponse = await request("skills/list");
-    const listResult = listResponse.result as {
-      resultType: string;
-      skills: Array<{
-        uri: string;
-        frontmatter: { name: string; description: string };
-        resources: Array<{ uri: string; digest: string; size: number }>;
-      }>;
-      ttlMs: number;
-      cacheScope: string;
-    };
+
+    const listResult = ParseResult.decodeUnknownSync(
+      SkillListResult,
+      ignoreExcess,
+    )(listResponse.result);
 
     expect(listResult.resultType).toBe("complete");
     expect(listResult.ttlMs).toBe(300_000);
@@ -131,13 +192,20 @@ describe("example skill extension", () => {
     const readResponse = await request("resources/read", {
       uri: EXAMPLE_SKILL_URI,
     });
+
     expect(readResponse.result).toMatchObject({
       ttlMs: 300_000,
       cacheScope: "public",
     });
-    const contents = (
-      readResponse.result?.contents as Array<{ text: string }>
-    )[0];
+
+    const readResult = ParseResult.decodeUnknownSync(
+      ResourceReadResult,
+      ignoreExcess,
+    )(readResponse.result);
+
+    const contents = readResult.contents[0];
+
+    if (!contents) throw new Error("expected skill text");
     const bytes = Buffer.from(contents.text, "utf8");
     expect(contents.text).toContain("# Example MCP server");
     expect(skill.resources[0].size).toBe(bytes.byteLength);
@@ -155,6 +223,7 @@ describe("example skill extension", () => {
     const response = await request("skills/get", {
       uri: "skill://missing/SKILL.md",
     });
+
     expect(response.error?.code).toBe(-32602);
   });
 });
@@ -164,6 +233,7 @@ describe("parseFrontmatter", () => {
     const frontmatter = parseFrontmatter(
       "---\nname: example-server\ndescription: An example skill.\n---\nBody text.",
     );
+
     expect(frontmatter).toMatchObject({
       name: "example-server",
       description: "An example skill.",
@@ -174,6 +244,7 @@ describe("parseFrontmatter", () => {
     const frontmatter = parseFrontmatter(
       "---\nname: example-server\ndescription: An example skill.\n---   \nBody text.",
     );
+
     expect(frontmatter).toMatchObject({
       name: "example-server",
       description: "An example skill.",
@@ -184,6 +255,7 @@ describe("parseFrontmatter", () => {
     const frontmatter = parseFrontmatter(
       "---\r\nname: example-server\r\ndescription: An example skill.\r\n---\r\nBody text.",
     );
+
     expect(frontmatter).toMatchObject({
       name: "example-server",
       description: "An example skill.",
@@ -194,6 +266,7 @@ describe("parseFrontmatter", () => {
     const frontmatter = parseFrontmatter(
       "---\r\nname: example-server\r\ndescription: An example skill.\r\n---  \r\nBody text.",
     );
+
     expect(frontmatter).toMatchObject({
       name: "example-server",
       description: "An example skill.",
@@ -220,6 +293,7 @@ describe("skills directory opt-out", () => {
     expect(getSkillsInstructions(missing)).toBe("");
 
     const empty = mkdtempSync(join(tmpdir(), "empty-skills-"));
+
     try {
       const catalog = loadSkillCatalog(empty);
       expect(catalog.entries).toEqual([]);
@@ -238,6 +312,7 @@ describe("skills directory opt-out", () => {
       "---\nname: example-server\ndescription: An example skill.\n---\nBody\n",
     );
     writeFileSync(join(skillDir, "notes.md"), Buffer.from([0xff, 0xfe]));
+
     try {
       expect(() => loadSkillCatalog(root)).toThrow(
         "Skill file example-server/notes.md is not valid UTF-8",
@@ -256,6 +331,7 @@ describe("skills directory opt-out", () => {
       "---\nname: example-server\ndescription: An example skill.\n---\nBody\n",
     );
     writeFileSync(join(skillDir, "blob.bin"), Buffer.from([0xff, 0xfe]));
+
     try {
       expect(loadSkillCatalog(root).entries).toHaveLength(1);
     } finally {
@@ -265,9 +341,11 @@ describe("skills directory opt-out", () => {
 
   it("does not advertise the extension when no skill directories exist", async () => {
     const empty = loadSkillCatalog(join(tmpdir(), "skills-do-not-exist"));
+
     const optedOut = createMcpHandler(() => {
       const server = new McpServer({ name: "test", version: "0.0.0" });
       registerSkills(server, empty);
+
       return server;
     });
 

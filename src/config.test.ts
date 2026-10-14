@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../package.json", () => ({
-  default: {
-    name: "from-package-json",
-    version: "9.9.9",
-  },
-}));
+import packageJson from "../package.json" with { type: "json" };
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -14,6 +8,7 @@ afterEach(() => {
 
 async function importConfig() {
   vi.resetModules();
+
   return import("./config.ts");
 }
 
@@ -30,8 +25,8 @@ describe("configuration", () => {
     expect(getConfig()).toEqual({
       PORT: 3000,
       NODE_ENV: "development",
-      SERVER_NAME: "from-package-json",
-      SERVER_VERSION: "9.9.9",
+      SERVER_NAME: packageJson.name,
+      SERVER_VERSION: packageJson.version,
       LOG_LEVEL: "info",
     });
   });

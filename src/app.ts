@@ -11,6 +11,7 @@ import { runMcpEffect } from "./lib/utils.ts";
 const getServer = () => {
   const config = getConfig();
   const instructions = getSkillsInstructions();
+
   const server = new McpServer(
     {
       name: config.SERVER_NAME,
@@ -68,6 +69,7 @@ export function createApp() {
               { error: error instanceof Error ? error.message : String(error) },
               "Unhandled error serving MCP request",
             );
+
             if (!res.headersSent) {
               res.status(500).json({
                 jsonrpc: "2.0",

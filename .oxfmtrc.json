@@ -2,5 +2,18 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 80,
   "sortPackageJson": false,
-  "ignorePatterns": []
+  "ignorePatterns": [
+    ".agent/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**",
+    ".continue/**",
+    ".cursor/**",
+    ".gemini/**",
+    ".opencode/**",
+    ".pi/**",
+    ".roo/**",
+    ".windsurf/**",
+    "tools/oxlint/anti-slop/**"
+  ]
 }

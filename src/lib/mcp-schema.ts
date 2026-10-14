@@ -1,5 +1,6 @@
 import type { StandardSchemaWithJSON } from "@modelcontextprotocol/server";
-import { JSONSchema, Schema } from "effect";
+import { JSONSchema, ParseResult, Schema } from "effect";
+import { JsonObject, JsonObjectSchema } from "./json.ts";
 
 type McpJsonSchemaOptions = Parameters<
   StandardSchemaWithJSON["~standard"]["jsonSchema"]["input"]
@@ -23,10 +24,12 @@ function toEffectJsonSchemaTarget(
 function makeMcpJsonSchema<Output, Input>(
   schema: Schema.Schema<Output, Input>,
   options: McpJsonSchemaOptions,
-): Record<string, unknown> {
-  return JSONSchema.make(schema, {
-    target: toEffectJsonSchemaTarget(options.target),
-  }) as unknown as Record<string, unknown>;
+): JsonObject {
+  return ParseResult.decodeUnknownSync(JsonObjectSchema)(
+    JSONSchema.make(schema, {
+      target: toEffectJsonSchemaTarget(options.target),
+    }),
+  );
 }
 
 /**

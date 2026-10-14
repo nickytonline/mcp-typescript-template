@@ -33,8 +33,8 @@ const loadConfig = Effect.withConfigProvider(ConfigProvider.fromEnv())(
 
 let config: Config | undefined;
 
-function failInvalidConfig(error: unknown): never {
-  process.stderr.write(`Invalid environment configuration: ${String(error)}\n`);
+function failInvalidConfig(cause: unknown): never {
+  process.stderr.write(`Invalid environment configuration: ${String(cause)}\n`);
   process.exit(1);
 }
 
@@ -46,6 +46,7 @@ export function getConfig(): Config {
       return failInvalidConfig(error);
     }
   }
+
   return config;
 }
 

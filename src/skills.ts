@@ -8,8 +8,9 @@ import {
   ProtocolErrorCode,
   type ServerContext,
 } from "@modelcontextprotocol/server";
-import { Schema } from "effect";
+import { Either, ParseResult, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
+import { JsonObjectSchema, type JsonValue } from "./lib/json.ts";
 import { toMcpSchema } from "./lib/mcp-schema.ts";
 
 const CACHE_TTL_MS = 300_000;
@@ -29,10 +30,24 @@ type SkillResource = {
   size: number;
 };
 
+const FrontmatterName = Schema.String.pipe(
+  Schema.minLength(1),
+  Schema.maxLength(64),
+  Schema.pattern(SKILL_NAME_PATTERN),
+);
+
+const FrontmatterDescription = Schema.String.pipe(
+  Schema.minLength(1),
+  Schema.maxLength(1024),
+);
+
+const MissingDirectory = Schema.Struct({
+  code: Schema.Literal("ENOENT"),
+});
+
 type SkillFrontmatter = {
-  name: string;
-  description: string;
-  [key: string]: unknown;
+  readonly name: string;
+  readonly description: string;
 };
 
 type SkillEntry = {
@@ -63,55 +78,64 @@ type SkillCatalog = {
 
 const skillsRoot = fileURLToPath(new URL("../skills/", import.meta.url));
 
-function isMapping(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function requireFrontmatterField(
+  value: JsonValue | undefined,
+  schema: Schema.Schema<string>,
+  message: string,
+): string {
+  const decoded = ParseResult.decodeUnknownEither(schema)(value);
+
+  if (Either.isLeft(decoded)) {
+    throw new Error(message);
+  }
+
+  return decoded.right;
 }
 
 export function parseFrontmatter(document: string): SkillFrontmatter {
   const opening = OPENING_FENCE.exec(document);
+
   if (!opening) {
     throw new Error("Skill SKILL.md must start with YAML frontmatter");
   }
 
   const body = document.slice(opening[0].length);
   const closing = CLOSING_FENCE.exec(body);
+
   if (!closing) {
     throw new Error("Skill SKILL.md has no closing YAML frontmatter marker");
   }
 
-  const parsed = parseYaml(body.slice(0, closing.index));
-  if (!isMapping(parsed)) {
+  const parsed = ParseResult.decodeUnknownEither(JsonObjectSchema)(
+    parseYaml(body.slice(0, closing.index)),
+  );
+
+  if (Either.isLeft(parsed)) {
     throw new Error("Skill frontmatter must be a YAML mapping");
   }
 
-  const { name, description } = parsed;
-  if (
-    typeof name !== "string" ||
-    name.length < 1 ||
-    name.length > 64 ||
-    !SKILL_NAME_PATTERN.test(name)
-  ) {
-    throw new Error(
-      "Skill frontmatter name must be 1-64 characters of lowercase letters, digits, and single hyphens",
-    );
-  }
-  if (
-    typeof description !== "string" ||
-    description.length < 1 ||
-    description.length > 1024
-  ) {
-    throw new Error(
-      "Skill frontmatter must include a 1-1024 character description",
-    );
-  }
+  const name = requireFrontmatterField(
+    parsed.right.name,
+    FrontmatterName,
+    "Skill frontmatter name must be 1-64 characters of lowercase letters, digits, and single hyphens",
+  );
 
-  return { ...parsed, name, description };
+  const description = requireFrontmatterField(
+    parsed.right.description,
+    FrontmatterDescription,
+    "Skill frontmatter must include a 1-1024 character description",
+  );
+
+  return { ...parsed.right, name, description };
 }
 
 function mimeTypeFor(relativePath: string): string {
   if (relativePath.endsWith(".md")) return "text/markdown";
+
   if (relativePath.endsWith(".json")) return "application/json";
+
   if (relativePath.endsWith(".txt")) return "text/plain";
+
   return "application/octet-stream";
 }
 
@@ -132,15 +156,18 @@ function collectSkillFiles(
 
     const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
     const path = join(directory, entry.name);
+
     if (entry.isDirectory()) {
       collectSkillFiles(path, skillName, relativePath, files);
       continue;
     }
+
     if (!entry.isFile()) continue;
 
     const bytes = readFileSync(path);
     const mimeType = mimeTypeFor(relativePath);
     const text = bytes.toString("utf8");
+
     if (
       mimeType !== "application/octet-stream" &&
       !Buffer.from(text, "utf8").equals(bytes)
@@ -149,6 +176,7 @@ function collectSkillFiles(
         `Skill file ${skillName}/${relativePath} is not valid UTF-8`,
       );
     }
+
     files.push({
       skillName,
       relativePath,
@@ -158,22 +186,26 @@ function collectSkillFiles(
       mimeType,
     });
   }
+
   return files;
 }
 
 function loadSkill(directoryName: string, directory: string): LoadedSkill {
   const files = collectSkillFiles(directory, directoryName);
   const skillFile = files.find((file) => file.relativePath === "SKILL.md");
+
   if (!skillFile) {
     throw new Error(`Skill directory ${directoryName} must contain SKILL.md`);
   }
 
   const frontmatter = parseFrontmatter(skillFile.text);
+
   if (frontmatter.name !== directoryName) {
     throw new Error(
       `Skill name ${frontmatter.name} must match its directory name ${directoryName}`,
     );
   }
+
   skillFile.description = frontmatter.description;
 
   if (files.length > MAX_SKILL_RESOURCES) {
@@ -186,6 +218,7 @@ function loadSkill(directoryName: string, directory: string): LoadedSkill {
     (sum, file) => sum + file.bytes.byteLength,
     0,
   );
+
   if (totalBytes > MAX_SKILL_BYTES) {
     throw new Error(
       `Skill ${directoryName} is ${totalBytes} bytes, above the ${MAX_SKILL_BYTES} byte limit`,
@@ -211,24 +244,23 @@ function loadSkill(directoryName: string, directory: string): LoadedSkill {
   };
 }
 
-function isMissingDirectory(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
+function isMissingDirectory(cause: unknown): boolean {
+  return ParseResult.is(MissingDirectory, { onExcessProperty: "ignore" })(
+    cause,
   );
 }
 
 /** Reads `skills/`. A missing or empty directory means the server publishes no skills. */
 export function loadSkillCatalog(root: string): SkillCatalog {
   let directoryEntries;
+
   try {
     directoryEntries = readdirSync(root, { withFileTypes: true });
   } catch (error) {
     if (isMissingDirectory(error)) {
       return { entries: [], files: new Map() };
     }
+
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to read skills directory ${root}: ${message}`);
   }
@@ -247,9 +279,11 @@ export function loadSkillCatalog(root: string): SkillCatalog {
 }
 
 const catalog = loadSkillCatalog(skillsRoot);
+
 const listSkillsParams = toMcpSchema(
   Schema.Struct({ cursor: Schema.optional(Schema.String) }),
 );
+
 const getSkillParams = toMcpSchema(Schema.Struct({ uri: Schema.String }));
 
 function invalidParams(message: string): ProtocolError {
@@ -268,6 +302,7 @@ function readResource(file: SkillFile, uri: URL) {
       ],
     };
   }
+
   return {
     contents: [{ uri: uri.href, mimeType: file.mimeType, text: file.text }],
   };
@@ -282,6 +317,7 @@ export function getSkillsInstructions(
   skillCatalog: SkillCatalog = catalog,
 ): string {
   const uris = skillCatalog.entries.map((entry) => entry.uri);
+
   if (uris.length === 0) return "";
 
   const listed =
@@ -333,6 +369,7 @@ export function registerSkills(
       if (cursor !== undefined) {
         throw invalidParams("Unknown skills/list cursor");
       }
+
       return {
         resultType: "complete",
         skills: skillCatalog.entries,
@@ -347,9 +384,11 @@ export function registerSkills(
     { params: getSkillParams },
     async ({ uri }) => {
       const skill = entriesByUri.get(uri);
+
       if (!skill) {
         throw invalidParams(`Unknown skill URI: ${uri}`);
       }
+
       return {
         resultType: "complete",
         skill,

@@ -4,7 +4,13 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
+import { ParseResult, Schema } from "effect";
 import { createApp } from "./app.ts";
+
+const TcpAddress = Schema.Struct({
+  port: Schema.Number,
+  address: Schema.String,
+});
 
 const EXAMPLE_SKILL_URI = "skill://example-server/SKILL.md";
 
@@ -23,6 +29,7 @@ afterEach(async () => {
   if (harness.client) {
     await harness.client.close();
   }
+
   await harness.handler.close();
   await closeHttpServer(harness.httpServer);
   harness = undefined;
@@ -44,7 +51,8 @@ async function setupHttpServer() {
   });
 
   const address = httpServer.address();
-  if (!address || typeof address === "string") {
+
+  if (!ParseResult.is(TcpAddress, { onExcessProperty: "ignore" })(address)) {
     throw new Error("expected the HTTP server to have a TCP address");
   }
 
@@ -53,18 +61,21 @@ async function setupHttpServer() {
     handler,
     baseUrl: `http://127.0.0.1:${address.port}`,
   };
+
   return harness;
 }
 
 async function setupHttpClient() {
   const appHarness = await setupHttpServer();
   const client = new Client({ name: "test-client", version: "0.0.0" }, {});
+
   const transport = new StreamableHTTPClientTransport(
     new URL(`${appHarness.baseUrl}/mcp`),
   );
 
   await client.connect(transport);
   appHarness.client = client;
+
   return { ...appHarness, client };
 }
 

@@ -6,11 +6,11 @@ A TypeScript template for building remote Model Context Protocol (MCP) servers w
 
 This template provides:
 
-- **TypeScript 7** - Native compiler with strict configuration; TypeScript 6 remains available for `typescript-eslint`'s compiler API
+- **TypeScript 7** - Native compiler with strict configuration; TypeScript 6 remains available as `tsc6`
 - **Effect** - Typed configuration, validation, logging, error handling, and async workflows
 - **Vite** - Fast build system with ES modules output
 - **Express** - Fast, unopinionated web framework for HTTP server
-- **ESLint + Oxfmt** - Code quality and formatting
+- **Oxlint + Oxfmt** - Code quality and formatting, including vendored anti-slop rules
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
 - **Example Agent Skill** - `example-server` published through the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)
@@ -59,7 +59,7 @@ npm install
 
 ### Type checking
 
-`npm run typecheck` uses the TypeScript 7 compiler. The `typescript` package is an npm alias for the TypeScript 6 compatibility package because `typescript-eslint` still depends on TypeScript's legacy compiler API; the compatibility package is available as `tsc6` when needed.
+`npm run typecheck` uses the TypeScript 7 compiler. The `typescript` package remains an npm alias for the TypeScript 6 compatibility package and is available as `tsc6` when needed.
 
 ### Watch mode for development (with hot reloading)
 
@@ -200,7 +200,7 @@ mcp-typescript-template/
 ├── dist/                 # Built output (generated)
 ├── tsconfig.json         # TypeScript configuration
 ├── vite.config.ts        # Vite build configuration
-├── eslint.config.js      # ESLint configuration
+├── .oxlintrc.json        # Oxlint configuration
 ├── .oxfmtrc.json         # Oxfmt configuration (Prettier-compatible)
 ├── Dockerfile            # Docker configuration
 └── package.json          # Dependencies and scripts

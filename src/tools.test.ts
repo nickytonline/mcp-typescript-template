@@ -1,3 +1,4 @@
+import { ParseResult } from "effect";
 import { afterEach, describe, it, expect } from "vitest";
 import {
   Client,
@@ -11,6 +12,7 @@ import {
   type ElicitRequest,
   type ElicitResult,
 } from "@modelcontextprotocol/server";
+import { JsonObjectSchema, type JsonObject } from "./lib/json.ts";
 import { registerTools } from "./tools.ts";
 
 type TestHarness = {
@@ -77,16 +79,19 @@ async function setupClientServer(options: SetupOptions = {}) {
   await client.connect(clientTransport);
 
   harness = { client, server };
+
   return harness;
 }
 
-function parseContent(result: CallToolResult): Record<string, unknown> {
+function parseContent(result: CallToolResult): JsonObject {
   const item = result.content[0];
   expect(item?.type).toBe("text");
+
   if (item?.type !== "text") {
     throw new Error("expected text content");
   }
-  return JSON.parse(item.text);
+
+  return ParseResult.decodeUnknownSync(JsonObjectSchema)(JSON.parse(item.text));
 }
 
 describe("echo tool", () => {
@@ -206,9 +211,11 @@ describe("elicit_echo tool", () => {
     // createErrorResult, so the message here is SDK-formatted, not ours.
     const item = result.content[0];
     expect(item?.type).toBe("text");
+
     if (item?.type === "text") {
       expect(item.text).toMatch(/elicitation/i);
     }
+
     expect(result.isError).toBe(true);
   });
 });
@@ -234,6 +241,7 @@ describe("elicit_echo tool (2026-07-28 modern era)", () => {
     registerTools(server);
 
     const handler = createMcpHandler(() => server);
+
     const transport = new StreamableHTTPClientTransport(
       new URL("http://localhost/mcp"),
       {
