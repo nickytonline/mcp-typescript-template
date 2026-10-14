@@ -158,7 +158,7 @@ describe("example skill extension", () => {
         extensions: { "io.modelcontextprotocol/skills": {} },
       },
     });
-    expect(response.result?.["instructions"]).toContain(EXAMPLE_SKILL_URI);
+    expect(response.result?.instructions).toContain(EXAMPLE_SKILL_URI);
   });
 
   it("lists a complete manifest, gets it by URI, and reads the skill resource", async () => {
@@ -352,8 +352,8 @@ describe("skills directory opt-out", () => {
     try {
       const payload = await request("server/discover", {}, optedOut);
       expect(payload.error).toBeUndefined();
-      expect(payload.result?.["instructions"]).toBeUndefined();
-      expect(payload.result?.["capabilities"]).not.toMatchObject({
+      expect(payload.result?.instructions).toBeUndefined();
+      expect(payload.result?.capabilities).not.toMatchObject({
         extensions: { "io.modelcontextprotocol/skills": {} },
       });
     } finally {
