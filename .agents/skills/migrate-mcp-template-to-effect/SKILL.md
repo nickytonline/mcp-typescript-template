@@ -41,12 +41,12 @@ Do not mechanically rewrite every Promise. Identify which code is application wo
 | Earlier template | Effect-based template |
 |---|---|
 | Zod schemas | Effect `Schema.Struct`, adapted with `toMcpSchema()` |
-| `.describe()` | `Schema.annotations({ description: "..." })` |
-| Pino / `pino-pretty` | Effect `Logger.json` and the shared `logger` facade |
+| `.describe()` | `Schema.annotate({ description: "..." })` |
+| Pino / `pino-pretty` | Effect `Logger.consoleJson` and the shared `logger` facade |
 | `process.env` parsing | Effect `Config` with `ConfigProvider.fromEnv()` |
 | `async` tool workflow | `Effect.gen(function* () { ... })` |
 | `await` an Effect | `yield*` the Effect inside `Effect.gen` |
-| Promise rejection handling | `Effect.tryPromise`, typed failures, and `Effect.catchAll` |
+| Promise rejection handling | `Effect.tryPromise`, typed failures, and `Effect.catch` |
 | `Promise.all` for independent effects | `Effect.all([...], { concurrency: "unbounded" })` |
 | MCP callback returns Promise | `runMcpEffect()` at the callback boundary |
 

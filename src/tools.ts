@@ -5,7 +5,7 @@ import type {
   ServerContext,
 } from "@modelcontextprotocol/server";
 import { inputRequired, inputResponse } from "@modelcontextprotocol/server";
-import { Effect, Either, ParseResult, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { toMcpSchema } from "./lib/mcp-schema.ts";
 import {
   createErrorResult,
@@ -18,11 +18,11 @@ const ELICIT_ECHO_MESSAGE_KEY = "message";
 
 const ElicitEchoOutputSchema = toMcpSchema(
   Schema.Struct({
-    echo: Schema.NullOr(Schema.String).annotations({
+    echo: Schema.NullOr(Schema.String).annotate({
       description: "The echoed message, or null if none was provided",
     }),
     reason: Schema.optional(
-      Schema.String.annotations({
+      Schema.String.annotate({
         description: "Why no message was echoed, when applicable",
       }),
     ),
@@ -31,7 +31,7 @@ const ElicitEchoOutputSchema = toMcpSchema(
 
 const EchoInputSchema = toMcpSchema(
   Schema.Struct({
-    message: Schema.String.annotations({
+    message: Schema.String.annotate({
       description: "The message to echo back",
     }),
   }),
@@ -39,7 +39,7 @@ const EchoInputSchema = toMcpSchema(
 
 const EchoOutputSchema = toMcpSchema(
   Schema.Struct({
-    echo: Schema.String.annotations({ description: "The echoed message" }),
+    echo: Schema.String.annotate({ description: "The echoed message" }),
   }),
 );
 
@@ -176,11 +176,11 @@ function elicitEcho(
       });
     }
 
-    const accepted = ParseResult.decodeUnknownEither(AcceptedElicitationSchema)(
+    const accepted = Schema.decodeUnknownResult(AcceptedElicitationSchema)(
       response.content,
     );
 
-    if (Either.isLeft(accepted)) {
+    if (Result.isFailure(accepted)) {
       yield* logger.warn(
         { toolName, requestId },
         "Accept response missing content",
@@ -193,7 +193,7 @@ function elicitEcho(
 
     yield* logger.info({ toolName, requestId }, "Tool executed");
 
-    return createTextResult({ echo: accepted.right.message });
+    return createTextResult({ echo: accepted.success.message });
   });
 }
 

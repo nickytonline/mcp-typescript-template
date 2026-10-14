@@ -47,11 +47,11 @@ server.registerTool(
     description: "A clear, specific description of what this tool does and when to use it",
     inputSchema: toMcpSchema(
       Schema.Struct({
-        query: Schema.String.annotations({
+        query: Schema.String.annotate({
           description: "The input to process — be specific about format or constraints",
         }),
         limit: Schema.optional(
-          Schema.Int.pipe(Schema.between(1, 100)).annotations({
+          Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })).annotate({
             description: "Maximum number of results to return (default: 10)",
           }),
         ),
@@ -99,7 +99,7 @@ function myTool(
 
 Key points:
 - Define input and output contracts with Effect `Schema.Struct(...)`, then wrap them with `toMcpSchema(...)`. The adapter supplies both Standard Schema validation and the JSON Schema needed by MCP, including `draft-07` and `draft-2020-12` targets
-- Use `Schema.annotations({ description: "..." })` for field descriptions; use Effect combinators such as `Schema.optional`, `Schema.Int`, and `Schema.between` for constraints
+- Use `Schema.annotate({ description: "..." })` for field descriptions; use Effect combinators such as `Schema.optional`, `Schema.Int`, and `Schema.isBetween` for constraints
 - Keep the tool's business logic in an `Effect.Effect` and call `runMcpEffect()` only in the MCP registration callback
 - Return `createTextResult(data)` on success — it emits both a text block and `structuredContent` for `outputSchema`-aware clients ([structured content](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content))
 - Keep the tool's logic in a function that receives the arguments and `ctx` it uses. This keeps each tool small and testable
@@ -156,7 +156,7 @@ function myTool(args, ctx): Effect.Effect<CallToolResult> {
     yield* logger.info({ toolName, requestId }, "Tool executed");
     return createTextResult(result);
   }).pipe(
-    Effect.catchAll((error) => Effect.succeed(createErrorResult({ error }))),
+    Effect.catch((error) => Effect.succeed(createErrorResult({ error }))),
   );
 }
 ```

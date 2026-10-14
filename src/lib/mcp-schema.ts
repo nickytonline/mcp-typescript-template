@@ -1,60 +1,64 @@
 import type { StandardSchemaWithJSON } from "@modelcontextprotocol/server";
-import { JSONSchema, ParseResult, Schema } from "effect";
-import { type JsonObject, JsonObjectSchema } from "./json.ts";
+import { Schema } from "effect";
+import { JsonObjectSchema, type JsonObject } from "./json.ts";
 
-type McpJsonSchemaOptions = Parameters<
-  StandardSchemaWithJSON["~standard"]["jsonSchema"]["input"]
->[0];
+const JSON_SCHEMA_DIALECT = {
+  "draft-07": "http://json-schema.org/draft-07/schema#",
+  "draft-2020-12": "https://json-schema.org/draft/2020-12/schema",
+} as const;
 
-function toEffectJsonSchemaTarget(
-  target: McpJsonSchemaOptions["target"],
-): "jsonSchema7" | "jsonSchema2020-12" {
-  switch (target) {
-    case "draft-07":
-      return "jsonSchema7";
-    case "draft-2020-12":
-      return "jsonSchema2020-12";
-    default:
-      throw new Error(
-        `Unsupported MCP JSON Schema target: ${String(target)}. Effect supports draft-07 and draft-2020-12.`,
-      );
-  }
+type SupportedJsonSchemaTarget = keyof typeof JSON_SCHEMA_DIALECT;
+
+function withDialect(schema: JsonObject, target: string): JsonObject {
+  if (!isSupportedTarget(target)) return schema;
+
+  return { ...schema, $schema: JSON_SCHEMA_DIALECT[target] };
 }
 
-function makeMcpJsonSchema<Output, Input>(
-  schema: Schema.Schema<Output, Input>,
-  options: McpJsonSchemaOptions,
-): JsonObject {
-  return ParseResult.decodeUnknownSync(JsonObjectSchema)(
-    JSONSchema.make(schema, {
-      target: toEffectJsonSchemaTarget(options.target),
-    }),
-  );
+function isSupportedTarget(
+  target: string,
+): target is SupportedJsonSchemaTarget {
+  return Object.hasOwn(JSON_SCHEMA_DIALECT, target);
 }
 
 /**
  * Adapts an Effect Schema to the Standard Schema + JSON Schema contract used
  * by the MCP SDK for tool input and output schemas.
  *
- * Effect already implements Standard Schema validation. The MCP SDK also
- * needs the companion JSON Schema converter to advertise schemas over the
- * wire, so this adapter supplies that one additional capability.
+ * Effect 4 exposes the two halves separately: `toStandardSchemaV1` validates
+ * and `toStandardJSONSchemaV1` advertises the schema over the wire. Effect's
+ * converter omits `$schema`, so this adapter stamps the dialect URI for the
+ * MCP SDK's `draft-07` and `draft-2020-12` targets.
  */
 export function toMcpSchema<Output, Input = Output>(
-  schema: Schema.Schema<Output, Input>,
+  schema: Schema.Codec<Output, Input>,
 ): StandardSchemaWithJSON<Input, Output> {
-  const standard = Schema.standardSchemaV1(schema);
+  const standard = Schema.toStandardJSONSchemaV1(
+    Schema.toStandardSchemaV1(schema),
+  );
 
-  const adapted = {
+  const jsonSchema = standard["~standard"].jsonSchema;
+
+  return {
     ...standard,
     "~standard": {
       ...standard["~standard"],
       jsonSchema: {
-        input: (options) => makeMcpJsonSchema(schema, options),
-        output: (options) => makeMcpJsonSchema(schema, options),
+        input: (options) =>
+          withDialect(
+            Schema.decodeUnknownSync(JsonObjectSchema)(
+              jsonSchema.input(options),
+            ),
+            options.target,
+          ),
+        output: (options) =>
+          withDialect(
+            Schema.decodeUnknownSync(JsonObjectSchema)(
+              jsonSchema.output(options),
+            ),
+            options.target,
+          ),
       },
     },
-  } satisfies StandardSchemaWithJSON<Input, Output>;
-
-  return adapted;
+  };
 }

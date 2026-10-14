@@ -10,17 +10,18 @@ export type JsonValue =
   | readonly JsonValue[]
   | JsonObject;
 
-export const Json: Schema.Schema<JsonValue> = Schema.suspend(() =>
-  Schema.Union(
-    Schema.String,
-    Schema.Number,
-    Schema.Boolean,
-    Schema.Null,
-    Schema.Array(Json),
-    JsonObjectSchema,
-  ),
+export const Json: Schema.Codec<JsonValue> = Schema.suspend(
+  (): Schema.Codec<JsonValue> =>
+    Schema.Union([
+      Schema.String,
+      Schema.Number,
+      Schema.Boolean,
+      Schema.Null,
+      Schema.Array(Json),
+      JsonObjectSchema,
+    ]),
 );
 
-export const JsonObjectSchema: Schema.Schema<JsonObject> = Schema.suspend(() =>
-  Schema.Record({ key: Schema.String, value: Json }),
+export const JsonObjectSchema: Schema.Codec<JsonObject> = Schema.suspend(
+  (): Schema.Codec<JsonObject> => Schema.Record(Schema.String, Json),
 );

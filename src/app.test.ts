@@ -4,7 +4,7 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { ParseResult, Schema } from "effect";
+import { Schema } from "effect";
 import { createApp } from "./app.ts";
 
 const TcpAddress = Schema.Struct({
@@ -52,7 +52,7 @@ async function setupHttpServer() {
 
   const address = httpServer.address();
 
-  if (!ParseResult.is(TcpAddress, { onExcessProperty: "ignore" })(address)) {
+  if (!Schema.is(TcpAddress)(address)) {
     throw new Error("expected the HTTP server to have a TCP address");
   }
 
