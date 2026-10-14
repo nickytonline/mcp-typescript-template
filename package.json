@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.3.1",
     "@types/express": "^5.0.6",
     "effect": "^3.22.2",
     "express": "^5.2.1",
