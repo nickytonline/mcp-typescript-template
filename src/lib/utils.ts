@@ -31,8 +31,6 @@ export function createTextResult(data: JsonValue | undefined): CallToolResult {
     ],
   };
 
-  // Only JSON objects can satisfy an outputSchema (`type: "object"`).
-  // Arrays and scalars stay in the text block.
   const parsed = ParseResult.decodeUnknownEither(JsonObjectSchema)(safeData);
 
   if (Either.isRight(parsed)) {

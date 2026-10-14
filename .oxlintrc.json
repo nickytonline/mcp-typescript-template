@@ -1,7 +1,5 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  // Default plugins stay off. The TypeScript override enables typescript and oxc
-  // for the migrated typescript-eslint rules and the vendored anti-slop rules.
   "plugins": [],
   "categories": {
     "correctness": "off"
