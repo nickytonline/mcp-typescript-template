@@ -6,16 +6,16 @@
   "main": "dist/index.js",
   "scripts": {
     "prebuild": "npm run typecheck",
-    "build": "vite build",
+    "build": "vp build",
     "dev": "node --watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "vitest",
-    "test:ci": "vitest run --reporter=json --outputFile=test-results.json",
+    "test": "vp test",
+    "test:ci": "vp test run --reporter=json --outputFile=test-results.json",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint src/ scripts/",
-    "lint:fix": "oxlint src/ scripts/ --fix",
-    "format": "oxfmt \"src/**/*.ts\" \"scripts/**/*.mts\"",
-    "format:check": "oxfmt --check \"src/**/*.ts\" \"scripts/**/*.mts\"",
+    "lint": "vp lint src/ scripts/",
+    "lint:fix": "vp lint src/ scripts/ --fix",
+    "format": "vp fmt \"src/**/*.ts\" \"scripts/**/*.mts\"",
+    "format:check": "vp fmt --check \"src/**/*.ts\" \"scripts/**/*.mts\"",
     "verify:skill-package": "node scripts/verify-skill-package.mts"
   },
   "keywords": [
@@ -28,25 +28,22 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.11.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.0",
     "@modelcontextprotocol/client": "^2.2.0",
-    "@oxlint/plugins": "1.88.0",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/git": "^11.0.1",
     "@types/node": "^22.20.5",
     "@typescript/native": "npm:typescript@^7.0.2",
     "concurrently": "^10.0.6",
     "conventional-changelog-conventionalcommits": "^10.4.1",
-    "oxfmt": "^0.73.0",
-    "oxlint": "1.88.0",
     "semantic-release": "^25.0.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
+    "vite-plus": "1.2.0"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",
@@ -55,5 +52,8 @@
     "effect": "^3.22.2",
     "express": "^5.2.1",
     "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
   }
 }

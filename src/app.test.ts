@@ -1,5 +1,5 @@
 import { createServer, type Server as HttpServer } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 import {
   Client,
   StreamableHTTPClientTransport,

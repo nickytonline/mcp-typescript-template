@@ -1,8 +1,8 @@
-import { defineRule } from "@oxlint/plugins";
+import { defineRule } from "vite-plus/lint/plugins";
 
 import { resolveVariable } from "../shared/scope.ts";
 
-import type { ESTree, SourceCode } from "@oxlint/plugins";
+import type { ESTree, SourceCode } from "vite-plus/lint/plugins";
 
 const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"]);
 

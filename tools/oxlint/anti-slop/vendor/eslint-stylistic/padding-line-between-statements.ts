@@ -1,5 +1,5 @@
 // Vendored from ESLint Stylistic; see UPSTREAM.md and LICENSE in this directory.
-import type { ESTree, Context as RuleContext, SourceCode, Token as SyntaxToken, Comment, CreateRule, Location } from '@oxlint/plugins'
+import type { ESTree, Context as RuleContext, SourceCode, Token as SyntaxToken, Comment, CreateRule, Location } from 'vite-plus/lint/plugins'
 type ASTNode = ESTree.Node
 type Token = SyntaxToken | Comment
 import type {

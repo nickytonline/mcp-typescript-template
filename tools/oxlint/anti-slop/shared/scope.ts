@@ -1,4 +1,4 @@
-import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
+import type { ESTree, Scope, SourceCode, Variable } from "vite-plus/lint/plugins";
 
 /** Resolve an identifier to its binding by walking lexical scopes upward. */
 export function resolveVariable(

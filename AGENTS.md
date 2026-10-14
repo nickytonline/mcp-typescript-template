@@ -8,7 +8,7 @@ TypeScript template for building [Model Context Protocol (MCP)](https://modelcon
 # Development (hot reload via native Node.js type stripping)
 npm run dev
 
-# Build (Vite → ES modules in dist/)
+# Build (Vite+ → ES modules in dist/index.js)
 npm run build
 
 # Production
@@ -21,7 +21,7 @@ npm run format
 npm run format:check
 
 # Tests
-npm run test       # interactive Vitest
+npm run test       # interactive Vitest via Vite+
 npm run test:ci    # outputs test-results.json
 ```
 
@@ -58,7 +58,7 @@ docs/
 dist/            # compiled output (ES modules)
 ```
 
-Config files (`vite.config.ts`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `Dockerfile`) live at the repo root. Vendored anti-slop Oxlint rules live in `tools/oxlint/anti-slop/`.
+Config files (`vite.config.ts`, `tsconfig.json`, `mise.toml`, `Dockerfile`) live at the repo root. `vite.config.ts` holds the Vite build plus the Oxlint (`lint`) and Oxfmt (`fmt`) settings. Vendored anti-slop Oxlint rules live in `tools/oxlint/anti-slop/`.
 
 ## Architecture
 
@@ -76,28 +76,28 @@ Config files (`vite.config.ts`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.jso
 
 ### Build System
 
-- Vite bundles to ES modules; `@modelcontextprotocol/server` and `@modelcontextprotocol/node` are external (not bundled)
-- TypeScript 7 provides the `tsc` compiler. The `typescript` dependency remains an npm alias for `@typescript/typescript6` and exposes `tsc6` for compatibility checks
+- Vite+ (`vite-plus`) provides the Vite build, Vitest, Oxlint, and Oxfmt. `npm run build` runs `vp build` and emits `dist/index.js`; `@modelcontextprotocol/server` and `@modelcontextprotocol/node` stay external
+- TypeScript 7 provides the `tsc` compiler. `npm run typecheck` stays `tsc --noEmit`. The `typescript` dependency remains an npm alias for `@typescript/typescript6` and exposes `tsc6` for compatibility checks
 - `@` path alias maps to `src/`
-- Node.js 24+ required (native TypeScript type stripping used in dev)
+- Node.js >=24.11.0 for the Vite+ toolchain (native TypeScript type stripping in dev). `mise.toml` pins Node 24 for mise; Vite+ does not read that file, and a global `vp` install is not required
 
 ## Environment Variables
 
 Defined and validated in `src/config.ts`:
 
-| Variable         | Default                    | Description                          |
-|------------------|----------------------------|--------------------------------------|
-| `PORT`           | `3000`                     | HTTP server port                     |
-| `NODE_ENV`       | —                          | `development` / `production` / `test` |
-| `SERVER_NAME`    | `name` in `package.json`   | MCP server name                      |
-| `SERVER_VERSION` | `version` in `package.json` | MCP server version                   |
-| `LOG_LEVEL`      | `info`                     | `error` / `warn` / `info` / `debug`  |
+| Variable         | Default                     | Description                           |
+| ---------------- | --------------------------- | ------------------------------------- |
+| `PORT`           | `3000`                      | HTTP server port                      |
+| `NODE_ENV`       | —                           | `development` / `production` / `test` |
+| `SERVER_NAME`    | `name` in `package.json`    | MCP server name                       |
+| `SERVER_VERSION` | `version` in `package.json` | MCP server version                    |
+| `LOG_LEVEL`      | `info`                      | `error` / `warn` / `info` / `debug`   |
 
 ## Coding Conventions
 
 - TypeScript with ES module syntax (`import`/`export`)
-- Oxfmt with Prettier-compatible defaults: 2-space indent, double quotes, trailing commas
-- Oxlint with the TypeScript plugin and vendored anti-slop rules — `any` is discouraged (warn)
+- Oxfmt, configured in the `fmt` block of `vite.config.ts`, with Prettier-compatible defaults: 2-space indent, double quotes, trailing commas
+- Oxlint, configured in the `lint` block of `vite.config.ts`, with the TypeScript plugin and vendored anti-slop rules — `any` is discouraged (warn). Test files import Vitest from `vite-plus/test`
 - Private class methods use `#` prefix
 - Intentionally unused params/vars: prefix with `_`
 - `camelCase` for functions/variables, `PascalCase` for types
@@ -144,7 +144,7 @@ To publish no skills, delete the directories under `skills/` and leave `skills/`
 
 ## Testing
 
-- Framework: Vitest
+- Framework: Vitest, run through Vite+ (`vp test`). Import the test API from `vite-plus/test`
 - Test files: `*.test.ts`, colocated beside the source (see `src/lib/utils.test.ts`)
 - Cover new tools, transports, config logic, schema adapters, and the HTTP app with focused tests
 - Use `async/await` for all async tests

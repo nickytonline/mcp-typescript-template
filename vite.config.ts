@@ -1,7 +1,139 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vite-plus";
 import { resolve } from "path";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command: _command }) => ({
+  fmt: {
+    printWidth: 80,
+    sortPackageJson: false,
+    ignorePatterns: [
+      ".agent/**",
+      ".agents/**",
+      ".claude/**",
+      ".codex/**",
+      ".continue/**",
+      ".cursor/**",
+      ".gemini/**",
+      ".opencode/**",
+      ".pi/**",
+      ".roo/**",
+      ".windsurf/**",
+      "tools/oxlint/anti-slop/**",
+      // npm run format only covers TypeScript. Keep markdown and YAML out of vp check.
+      "**/*.md",
+      "**/*.yml",
+      "**/*.yaml",
+    ],
+  },
+  lint: {
+    plugins: [],
+    categories: {
+      correctness: "off",
+    },
+    env: {
+      builtin: true,
+    },
+    ignorePatterns: [
+      "dist/**",
+      "node_modules/**",
+      "*.config.js",
+      "coverage/**",
+      ".agent/**",
+      ".agents/**",
+      ".claude/**",
+      ".codex/**",
+      ".continue/**",
+      ".cursor/**",
+      ".gemini/**",
+      ".opencode/**",
+      ".pi/**",
+      ".roo/**",
+      ".windsurf/**",
+      "tools/oxlint/anti-slop/**",
+    ],
+    jsPlugins: [
+      {
+        name: "anti-slop",
+        specifier: "./tools/oxlint/anti-slop/index.ts",
+      },
+      {
+        name: "anti-slop-effect",
+        specifier: "./tools/oxlint/anti-slop/effect/index.ts",
+      },
+      {
+        name: "vite-plus",
+        specifier: "vite-plus/oxlint-plugin",
+      },
+    ],
+    overrides: [
+      {
+        files: ["**/*.ts", "**/*.mts"],
+        rules: {
+          "no-array-constructor": "error",
+          "no-unused-expressions": "error",
+          "no-unused-vars": [
+            "error",
+            {
+              argsIgnorePattern: "^_",
+            },
+          ],
+          "typescript/ban-ts-comment": "error",
+          "typescript/no-duplicate-enum-values": "error",
+          "typescript/no-empty-object-type": "error",
+          "typescript/no-explicit-any": "warn",
+          "typescript/no-extra-non-null-assertion": "error",
+          "typescript/no-misused-new": "error",
+          "typescript/no-namespace": "error",
+          "typescript/no-non-null-asserted-optional-chain": "error",
+          "typescript/no-require-imports": "error",
+          "typescript/no-this-alias": "error",
+          "typescript/no-unnecessary-type-constraint": "error",
+          "typescript/no-unsafe-declaration-merging": "error",
+          "typescript/no-unsafe-function-type": "error",
+          "typescript/no-wrapper-object-types": "error",
+          "typescript/prefer-as-const": "error",
+          "typescript/prefer-namespace-keyword": "error",
+          "typescript/triple-slash-reference": "error",
+          "typescript/explicit-function-return-type": "off",
+          "typescript/explicit-module-boundary-types": "off",
+          "oxc/no-accumulating-spread": "error",
+          "anti-slop/no-array-filter-map": "error",
+          "anti-slop/no-reduce-accumulator-copy": "error",
+          "anti-slop/no-chained-type-assertions": "error",
+          "anti-slop/no-conditional-empty-object-spread": "error",
+          "anti-slop/no-known-value-widening": "error",
+          "anti-slop/no-module-mocking": "error",
+          "anti-slop/no-object-parameters": "error",
+          "anti-slop/no-reflect-apply": "error",
+          "anti-slop/no-reflect-get": "error",
+          "anti-slop/no-runtime-typeof": "error",
+          "anti-slop/no-shape-in-symbol-names": "error",
+          "anti-slop/no-unknown-parameters": "error",
+          "anti-slop/no-unknown-returns": "error",
+          "anti-slop/no-unknown-type-aliases": "error",
+          "anti-slop/no-unsafe-dictionary-type": "error",
+          "anti-slop/no-widen-then-assert": "error",
+          "anti-slop/require-readable-spacing": "error",
+          "anti-slop/require-safety-comment-for-type-assertion": "error",
+          "anti-slop-effect/no-manual-effect-error-tag": "error",
+          "anti-slop-effect/no-manual-tag-comparison": "error",
+          "anti-slop-effect/no-manual-tagged-construction": "error",
+          "anti-slop-effect/no-service-constructor-imports": "error",
+          "anti-slop-effect/prefer-effect-match": "error",
+        },
+        plugins: ["typescript", "oxc"],
+        env: {
+          node: true,
+        },
+      },
+    ],
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
+    rules: {
+      "vite-plus/prefer-vite-plus-imports": "error",
+    },
+  },
   // Build configuration
   build: {
     lib: {
@@ -21,6 +153,11 @@ export default defineConfig(({ command }) => ({
     },
   },
   ssr: {
-    external: ["@modelcontextprotocol/server", "@modelcontextprotocol/node", "express", "effect"],
+    external: [
+      "@modelcontextprotocol/server",
+      "@modelcontextprotocol/node",
+      "express",
+      "effect",
+    ],
   },
 }));

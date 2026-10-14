@@ -1,5 +1,5 @@
 # using slim instead of alpine for better compatibility with optional dependencies
-# Node.js 24.0.0+ required (Active LTS)
+# Node.js 24.11+ required to build with Vite+. The image tag tracks current Node 24.
 FROM node:24-slim
 
 RUN apt-get update && apt-get install -y python3 make g++ git && rm -rf /var/lib/apt/lists/*

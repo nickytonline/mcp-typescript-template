@@ -11,4 +11,4 @@ The copy is `skills/install-anti-slop/assets/anti-slop` from that revision. Thos
 
 ## Deviations
 
-None in the vendored rules. This repository enables every generic rule and the Effect rule group at `error`, plus native `oxc/no-accumulating-spread`. The `oxc` plugin is listed explicitly because the root Oxlint config turns default plugins off.
+None in the vendored rules. This repository enables every generic rule and the Effect rule group at `error`, plus native `oxc/no-accumulating-spread`. The `oxc` plugin is listed explicitly because the lint config in `vite.config.ts` turns default plugins off.
