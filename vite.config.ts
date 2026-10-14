@@ -77,6 +77,7 @@ export default defineConfig(({ command: _command }) => ({
             },
           ],
           "typescript/ban-ts-comment": "error",
+          "typescript/consistent-type-imports": "error",
           "typescript/no-duplicate-enum-values": "error",
           "typescript/no-empty-object-type": "error",
           "typescript/no-explicit-any": "warn",

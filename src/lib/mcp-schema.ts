@@ -1,6 +1,6 @@
 import type { StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 import { JSONSchema, ParseResult, Schema } from "effect";
-import { JsonObject, JsonObjectSchema } from "./json.ts";
+import { type JsonObject, JsonObjectSchema } from "./json.ts";
 
 type McpJsonSchemaOptions = Parameters<
   StandardSchemaWithJSON["~standard"]["jsonSchema"]["input"]
