@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
-import { ParseResult, Schema } from "effect";
+import { Schema } from "effect";
 import { JsonObjectSchema, type JsonObject } from "./lib/json.ts";
 import {
   getSkillsInstructions,
@@ -141,7 +141,7 @@ async function request(
 
   if (!payload) throw new Error(`Missing SSE data in ${body}`);
 
-  return ParseResult.decodeUnknownSync(
+  return Schema.decodeUnknownSync(
     JsonRpcResponseSchema,
     ignoreExcess,
   )(JSON.parse(payload));
@@ -164,7 +164,7 @@ describe("example skill extension", () => {
   it("lists a complete manifest, gets it by URI, and reads the skill resource", async () => {
     const listResponse = await request("skills/list");
 
-    const listResult = ParseResult.decodeUnknownSync(
+    const listResult = Schema.decodeUnknownSync(
       SkillListResult,
       ignoreExcess,
     )(listResponse.result);
@@ -198,7 +198,7 @@ describe("example skill extension", () => {
       cacheScope: "public",
     });
 
-    const readResult = ParseResult.decodeUnknownSync(
+    const readResult = Schema.decodeUnknownSync(
       ResourceReadResult,
       ignoreExcess,
     )(readResponse.result);

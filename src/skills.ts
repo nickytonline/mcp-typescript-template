@@ -8,7 +8,7 @@ import {
   ProtocolErrorCode,
   type ServerContext,
 } from "@modelcontextprotocol/server";
-import { Either, ParseResult, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
 import { JsonObjectSchema, type JsonValue } from "./lib/json.ts";
 import { toMcpSchema } from "./lib/mcp-schema.ts";
@@ -30,15 +30,15 @@ type SkillResource = {
   size: number;
 };
 
-const FrontmatterName = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
-  Schema.pattern(SKILL_NAME_PATTERN),
+const FrontmatterName = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(64),
+  Schema.isPattern(SKILL_NAME_PATTERN),
 );
 
-const FrontmatterDescription = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(1024),
+const FrontmatterDescription = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(1024),
 );
 
 const MissingDirectory = Schema.Struct({
@@ -80,16 +80,16 @@ const skillsRoot = fileURLToPath(new URL("../skills/", import.meta.url));
 
 function requireFrontmatterField(
   value: JsonValue | undefined,
-  schema: Schema.Schema<string>,
+  schema: Schema.Codec<string>,
   message: string,
 ): string {
-  const decoded = ParseResult.decodeUnknownEither(schema)(value);
+  const decoded = Schema.decodeUnknownResult(schema)(value);
 
-  if (Either.isLeft(decoded)) {
+  if (Result.isFailure(decoded)) {
     throw new Error(message);
   }
 
-  return decoded.right;
+  return decoded.success;
 }
 
 export function parseFrontmatter(document: string): SkillFrontmatter {
@@ -106,27 +106,27 @@ export function parseFrontmatter(document: string): SkillFrontmatter {
     throw new Error("Skill SKILL.md has no closing YAML frontmatter marker");
   }
 
-  const parsed = ParseResult.decodeUnknownEither(JsonObjectSchema)(
+  const parsed = Schema.decodeUnknownResult(JsonObjectSchema)(
     parseYaml(body.slice(0, closing.index)),
   );
 
-  if (Either.isLeft(parsed)) {
+  if (Result.isFailure(parsed)) {
     throw new Error("Skill frontmatter must be a YAML mapping");
   }
 
   const name = requireFrontmatterField(
-    parsed.right.name,
+    parsed.success.name,
     FrontmatterName,
     "Skill frontmatter name must be 1-64 characters of lowercase letters, digits, and single hyphens",
   );
 
   const description = requireFrontmatterField(
-    parsed.right.description,
+    parsed.success.description,
     FrontmatterDescription,
     "Skill frontmatter must include a 1-1024 character description",
   );
 
-  return { ...parsed.right, name, description };
+  return { ...parsed.success, name, description };
 }
 
 function mimeTypeFor(relativePath: string): string {
@@ -245,9 +245,7 @@ function loadSkill(directoryName: string, directory: string): LoadedSkill {
 }
 
 function isMissingDirectory(cause: unknown): boolean {
-  return ParseResult.is(MissingDirectory, { onExcessProperty: "ignore" })(
-    cause,
-  );
+  return Schema.is(MissingDirectory)(cause);
 }
 
 /** Reads `skills/`. A missing or empty directory means the server publishes no skills. */

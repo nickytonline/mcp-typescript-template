@@ -2,34 +2,26 @@ import { Config as EffectConfig, ConfigProvider, Effect } from "effect";
 import packageJson from "../package.json" with { type: "json" };
 
 const configEffect = EffectConfig.all({
-  PORT: EffectConfig.number("PORT").pipe(EffectConfig.withDefault(3000)),
-  NODE_ENV: EffectConfig.literal(
-    "development",
-    "production",
-    "test",
-  )("NODE_ENV").pipe(EffectConfig.withDefault("development")),
-  SERVER_NAME: EffectConfig.string("SERVER_NAME").pipe(
+  PORT: EffectConfig.Number("PORT").pipe(EffectConfig.withDefault(3000)),
+  NODE_ENV: EffectConfig.Literals(
+    ["development", "production", "test"],
+    "NODE_ENV",
+  ).pipe(EffectConfig.withDefault("development")),
+  SERVER_NAME: EffectConfig.String("SERVER_NAME").pipe(
     EffectConfig.withDefault(packageJson.name),
   ),
-  SERVER_VERSION: EffectConfig.string("SERVER_VERSION").pipe(
+  SERVER_VERSION: EffectConfig.String("SERVER_VERSION").pipe(
     EffectConfig.withDefault(packageJson.version),
   ),
-  LOG_LEVEL: EffectConfig.literal(
-    "error",
-    "warn",
-    "info",
-    "debug",
-  )("LOG_LEVEL").pipe(EffectConfig.withDefault("info")),
+  LOG_LEVEL: EffectConfig.Literals(
+    ["error", "warn", "info", "debug"],
+    "LOG_LEVEL",
+  ).pipe(EffectConfig.withDefault("info")),
 });
 
-export type Config =
-  typeof configEffect extends EffectConfig.Config<infer ConfigValue>
-    ? ConfigValue
-    : never;
+export type Config = Effect.Success<typeof configEffect>;
 
-const loadConfig = Effect.withConfigProvider(ConfigProvider.fromEnv())(
-  configEffect,
-);
+const loadConfig = configEffect.parse(ConfigProvider.fromEnv());
 
 let config: Config | undefined;
 

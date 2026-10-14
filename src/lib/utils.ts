@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
-import { Effect, Either, ParseResult } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { JsonObjectSchema, type JsonValue } from "./json.ts";
 
 /**
@@ -31,10 +31,10 @@ export function createTextResult(data: JsonValue | undefined): CallToolResult {
     ],
   };
 
-  const parsed = ParseResult.decodeUnknownEither(JsonObjectSchema)(safeData);
+  const parsed = Schema.decodeUnknownResult(JsonObjectSchema)(safeData);
 
-  if (Either.isRight(parsed)) {
-    result.structuredContent = parsed.right;
+  if (Result.isSuccess(parsed)) {
+    result.structuredContent = parsed.success;
   }
 
   return result;

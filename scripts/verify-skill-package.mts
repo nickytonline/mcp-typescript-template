@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
-import { ParseResult, Schema } from "effect";
+import { Schema } from "effect";
 
 const NpmPackEntry = Schema.Struct({
   filename: Schema.String,
@@ -39,7 +39,7 @@ function collectFiles(directory: string, files: string[] = []): string[] {
 }
 
 function readPackFilename(output: string): string {
-  const metadata = ParseResult.decodeUnknownSync(Schema.Array(NpmPackEntry), {
+  const metadata = Schema.decodeUnknownSync(Schema.Array(NpmPackEntry), {
     onExcessProperty: "ignore",
   })(JSON.parse(output));
 
@@ -53,9 +53,7 @@ function readPackFilename(output: string): string {
 }
 
 function isMissingDirectory(cause: unknown): boolean {
-  return ParseResult.is(MissingDirectory, { onExcessProperty: "ignore" })(
-    cause,
-  );
+  return Schema.is(MissingDirectory)(cause);
 }
 
 function bundledSkillFiles(directory: string): string[] {

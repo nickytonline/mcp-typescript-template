@@ -53,6 +53,6 @@ describe("toMcpSchema", () => {
   it("rejects unsupported JSON Schema targets", () => {
     expect(() =>
       schema["~standard"].jsonSchema.input({ target: "openapi-3.0" }),
-    ).toThrow("Unsupported MCP JSON Schema target");
+    ).toThrow("Unsupported target");
   });
 });

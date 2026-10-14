@@ -1,4 +1,4 @@
-import { ParseResult } from "effect";
+import { Schema } from "effect";
 import { afterEach, describe, it, expect } from "vite-plus/test";
 import {
   Client,
@@ -91,7 +91,7 @@ function parseContent(result: CallToolResult): JsonObject {
     throw new Error("expected text content");
   }
 
-  return ParseResult.decodeUnknownSync(JsonObjectSchema)(JSON.parse(item.text));
+  return Schema.decodeUnknownSync(JsonObjectSchema)(JSON.parse(item.text));
 }
 
 describe("echo tool", () => {
