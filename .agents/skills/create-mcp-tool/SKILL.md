@@ -285,7 +285,7 @@ npm run test
 ```bash
 npm run build        # compile TypeScript
 npm run lint         # ESLint
-npm run format:check # Prettier formatting check
+npm run format:check # Oxfmt formatting check
 npm run test:ci      # Vitest (non-interactive, outputs test-results.json)
 npm run dev          # start server with hot reload for manual testing
 ```

@@ -15,9 +15,14 @@ const minimumLevel = {
 
 type ConfigLogLevel = "error" | "warn" | "info" | "debug";
 
-function log(level: LogLevel.LogLevel, fieldsOrMessage: LogInput, message?: string) {
+function log(
+  level: LogLevel.LogLevel,
+  fieldsOrMessage: LogInput,
+  message?: string,
+) {
   const fields = typeof fieldsOrMessage === "string" ? {} : fieldsOrMessage;
-  const text = typeof fieldsOrMessage === "string" ? fieldsOrMessage : (message ?? "");
+  const text =
+    typeof fieldsOrMessage === "string" ? fieldsOrMessage : (message ?? "");
 
   return Effect.logWithLevel(level, text).pipe(
     Effect.annotateLogs({
