@@ -10,7 +10,7 @@ This template provides:
 - **Effect** - Typed configuration, validation, logging, error handling, and async workflows
 - **Vite** - Fast build system with ES modules output
 - **Express** - Fast, unopinionated web framework for HTTP server
-- **Oxlint + Oxfmt** - Code quality and formatting
+- **Oxlint + Oxfmt** - Code quality and formatting, including vendored anti-slop rules
 - **Docker** - Containerization support
 - **Example Tools** - `echo` and `elicit_echo` tools demonstrating tool implementation, structured output, annotations, and MCP elicitation
 - **Example Agent Skill** - `example-server` published through the MCP Skills extension (`skills/list`, `skills/get`, and `resources/read`)

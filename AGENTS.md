@@ -58,7 +58,7 @@ docs/
 dist/            # compiled output (ES modules)
 ```
 
-Config files (`vite.config.ts`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `Dockerfile`) live at the repo root.
+Config files (`vite.config.ts`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `Dockerfile`) live at the repo root. Vendored anti-slop Oxlint rules live in `tools/oxlint/anti-slop/`.
 
 ## Architecture
 
@@ -97,7 +97,7 @@ Defined and validated in `src/config.ts`:
 
 - TypeScript with ES module syntax (`import`/`export`)
 - Oxfmt with Prettier-compatible defaults: 2-space indent, double quotes, trailing commas
-- Oxlint with the TypeScript plugin — `any` is discouraged (warn)
+- Oxlint with the TypeScript plugin and vendored anti-slop rules — `any` is discouraged (warn)
 - Private class methods use `#` prefix
 - Intentionally unused params/vars: prefix with `_`
 - `camelCase` for functions/variables, `PascalCase` for types

@@ -110,6 +110,7 @@ function elicitEcho(
   return Effect.gen(function* () {
     const toolName = "elicit_echo";
     const requestId = ctx.mcpReq.id;
+
     const response = inputResponse(
       ctx.mcpReq.inputResponses,
       ELICIT_ECHO_MESSAGE_KEY,
@@ -147,6 +148,7 @@ function elicitEcho(
         { toolName, requestId, kind: response.kind },
         "Tool execution failed",
       );
+
       return createErrorResult({ error: "Expected an elicitation response" });
     }
 
@@ -155,6 +157,7 @@ function elicitEcho(
         { toolName, requestId, action: "decline" },
         "User declined elicitation",
       );
+
       return createTextResult({
         echo: null,
         reason: "User declined to provide a message",
@@ -166,6 +169,7 @@ function elicitEcho(
         { toolName, requestId, action: "cancel" },
         "User cancelled elicitation",
       );
+
       return createTextResult({
         echo: null,
         reason: "Elicitation was cancelled",
@@ -175,17 +179,20 @@ function elicitEcho(
     const accepted = ParseResult.decodeUnknownEither(AcceptedElicitationSchema)(
       response.content,
     );
+
     if (Either.isLeft(accepted)) {
       yield* logger.warn(
         { toolName, requestId },
         "Accept response missing content",
       );
+
       return createErrorResult({
         error: "Accepted but no content was returned",
       });
     }
 
     yield* logger.info({ toolName, requestId }, "Tool executed");
+
     return createTextResult({ echo: accepted.right.message });
   });
 }
@@ -207,6 +214,7 @@ function echo(
     const requestId = ctx.mcpReq.id;
     const data = { echo: args.message };
     yield* logger.info({ toolName, requestId }, "Tool executed");
+
     return createTextResult(data);
   });
 }

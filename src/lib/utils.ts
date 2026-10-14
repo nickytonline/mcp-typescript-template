@@ -1,5 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
-import { Effect } from "effect";
+import { Effect, Either, ParseResult } from "effect";
+import { JsonObjectSchema, type JsonValue } from "./json.ts";
 
 /**
  * Creates a successful CallToolResult from any data.
@@ -17,7 +18,7 @@ import { Effect } from "effect";
  * @param data - The data to include in the result
  * @returns A properly formatted CallToolResult
  */
-export function createTextResult(data: unknown): CallToolResult {
+export function createTextResult(data: JsonValue | undefined): CallToolResult {
   // Handle undefined gracefully by converting to null
   const safeData = data === undefined ? null : data;
 
@@ -30,10 +31,12 @@ export function createTextResult(data: unknown): CallToolResult {
     ],
   };
 
-  // Only objects can satisfy an outputSchema (JSON Schema `type: "object"`),
-  // so we only attach structuredContent for object payloads.
-  if (safeData !== null && typeof safeData === "object") {
-    result.structuredContent = safeData as Record<string, unknown>;
+  // Only JSON objects can satisfy an outputSchema (`type: "object"`).
+  // Arrays and scalars stay in the text block.
+  const parsed = ParseResult.decodeUnknownEither(JsonObjectSchema)(safeData);
+
+  if (Either.isRight(parsed)) {
+    result.structuredContent = parsed.right;
   }
 
   return result;
@@ -51,7 +54,7 @@ export function createTextResult(data: unknown): CallToolResult {
  * @param data - The error payload to include in the result
  * @returns A CallToolResult flagged as an error
  */
-export function createErrorResult(data: unknown): CallToolResult {
+export function createErrorResult(data: JsonValue | undefined): CallToolResult {
   return { ...createTextResult(data), isError: true };
 }
 

@@ -16,8 +16,9 @@ describe("createTextResult", () => {
     expect(result.content).toHaveLength(1);
     expect(item).toHaveProperty("type", "text");
     expect(item).toHaveProperty("text");
+
     if (item.type === "text") {
-      expect(typeof item.text).toBe("string");
+      expect(item.text.length).toBeGreaterThan(0);
     }
   });
 
@@ -26,6 +27,7 @@ describe("createTextResult", () => {
     const item = result.content[0];
 
     expect(item.type).toBe("text");
+
     if (item.type === "text") {
       expect(item.text).toContain('"echo": "Hello world"');
     }
@@ -36,6 +38,7 @@ describe("createTextResult", () => {
     const item = result.content[0];
 
     expect(item.type).toBe("text");
+
     if (item.type === "text") {
       expect(item.text).toBe("null");
     }
@@ -46,6 +49,7 @@ describe("createTextResult", () => {
     const item = result.content[0];
 
     expect(item.type).toBe("text");
+
     if (item.type === "text") {
       expect(item.text).toBe("null");
     }
@@ -73,6 +77,7 @@ describe("createErrorResult", () => {
 
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({ error: "boom" });
+
     if (item.type === "text") {
       expect(item.text).toContain('"error": "boom"');
     }

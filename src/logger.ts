@@ -1,10 +1,17 @@
-import { Effect, LogLevel, Logger } from "effect";
+import { Effect, LogLevel, Logger, ParseResult, Schema } from "effect";
 import { getConfig } from "./config.ts";
 
 const config = getConfig();
 
-type LogFields = Readonly<Record<string, unknown>>;
+type LogValue = string | number | boolean | null;
+
+type LogFields = { readonly [key: string]: LogValue };
+
 type LogInput = LogFields | string;
+
+function isLogMessage(value: LogInput): value is string {
+  return ParseResult.is(Schema.String)(value);
+}
 
 const minimumLevel = {
   error: LogLevel.Error,
@@ -20,9 +27,11 @@ function log(
   fieldsOrMessage: LogInput,
   message?: string,
 ) {
-  const fields = typeof fieldsOrMessage === "string" ? {} : fieldsOrMessage;
-  const text =
-    typeof fieldsOrMessage === "string" ? fieldsOrMessage : (message ?? "");
+  const fields = isLogMessage(fieldsOrMessage) ? {} : fieldsOrMessage;
+
+  const text = isLogMessage(fieldsOrMessage)
+    ? fieldsOrMessage
+    : (message ?? "");
 
   return Effect.logWithLevel(level, text).pipe(
     Effect.annotateLogs({

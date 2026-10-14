@@ -18,6 +18,7 @@ const main = Effect.gen(function* () {
     const server = app.listen(config.PORT, () => {
       resume(Effect.succeed(server));
     });
+
     server.once("error", (error) => resume(Effect.fail(error)));
   });
 

@@ -8,50 +8,53 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
+import { ParseResult, Schema } from "effect";
 
-type NpmPackEntry = {
-  filename: string;
-};
+const NpmPackEntry = Schema.Struct({
+  filename: Schema.String,
+});
+
+const MissingDirectory = Schema.Struct({
+  code: Schema.Literal("ENOENT"),
+});
 
 function collectFiles(directory: string, files: string[] = []): string[] {
   const entries: Dirent[] = readdirSync(directory, { withFileTypes: true });
+
   for (const entry of entries.sort((left: Dirent, right: Dirent) =>
     left.name.localeCompare(right.name),
   )) {
     if (entry.name.startsWith(".")) continue;
     const path = join(directory, entry.name);
+
     if (entry.isDirectory()) {
       collectFiles(path, files);
       continue;
     }
+
     if (entry.isFile()) files.push(path);
   }
+
   return files;
 }
 
-function isNpmPackEntry(value: unknown): value is NpmPackEntry {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "filename" in value &&
-    typeof value.filename === "string"
-  );
-}
-
 function readPackFilename(output: string): string {
-  const metadata: unknown = JSON.parse(output);
-  if (!Array.isArray(metadata) || !isNpmPackEntry(metadata[0])) {
+  const metadata = ParseResult.decodeUnknownSync(Schema.Array(NpmPackEntry), {
+    onExcessProperty: "ignore",
+  })(JSON.parse(output));
+
+  const entry = metadata[0];
+
+  if (!entry) {
     throw new Error("npm pack did not return a tarball filename");
   }
-  return metadata[0].filename;
+
+  return entry.filename;
 }
 
-function isMissingDirectory(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ENOENT"
+function isMissingDirectory(cause: unknown): boolean {
+  return ParseResult.is(MissingDirectory, { onExcessProperty: "ignore" })(
+    cause,
   );
 }
 
@@ -66,6 +69,7 @@ function bundledSkillFiles(directory: string): string[] {
 
 const sourceRoot = resolve("skills");
 const sourceFiles = bundledSkillFiles(sourceRoot);
+
 if (sourceFiles.length === 0) {
   process.stdout.write("no bundled skills to verify\n");
   process.exit(0);
@@ -86,19 +90,24 @@ try {
       },
     },
   );
+
   const filename = readPackFilename(output);
 
   for (const sourcePath of sourceFiles) {
     const skillPath = relative(resolve("."), sourcePath).split("\\").join("/");
+
     const packaged: Buffer = execFileSync("tar", [
       "-xOf",
       join(destination, filename),
       `package/${skillPath}`,
     ]);
+
     const sourceBytes: Buffer = readFileSync(sourcePath);
+
     if (!sourceBytes.equals(packaged)) {
       throw new Error(`${skillPath} differs between source and npm package`);
     }
+
     process.stdout.write(`verified ${skillPath} in ${filename}\n`);
   }
 } finally {
