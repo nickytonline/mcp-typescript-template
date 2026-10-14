@@ -31,9 +31,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Build the commit Release validated. The main branch can move while
+          # that workflow is still running, and checking it out drops the image.
           ref: >-
-            ${{ github.event_name == 'workflow_run' && 'main' ||
+            ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha ||
             (inputs.version != '' && format('v{0}', inputs.version) || github.ref) }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -50,49 +57,10 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || '' }}
           VERSION_INPUT: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          source_sha="$(git rev-parse HEAD)"
-          if [ -n "$EXPECTED_SHA" ] && [ "$source_sha" != "$EXPECTED_SHA" ]; then
-            echo "main moved since the release workflow ran" >&2
-            exit 1
-          fi
-
-          version="$VERSION_INPUT"
-          if [ -n "$version" ]; then
-            expected_tag="v${version}"
-            actual_tag="$(git describe --tags --exact-match HEAD)"
-            if [ "$actual_tag" != "$expected_tag" ]; then
-              echo "checked out $actual_tag, expected $expected_tag" >&2
-              exit 1
-            fi
-          fi
-
-          if [ -z "$version" ]; then
-            version="$(git tag --points-at "$source_sha" \
-              | sed -n 's/^v//p' \
-              | head -n 1)"
-          fi
-
-          latest_version="$(git tag --sort=-version:refname \
-            | sed -n '/^v[0-9]/p' \
-            | head -n 1 \
-            | sed 's/^v//')"
-
-          {
-            echo 'tags<<EOF'
-            if [ -z "$version" ] || [ "$version" = "$latest_version" ]; then
-              echo "${IMAGE}:latest"
-            fi
-            echo "${IMAGE}:sha-${source_sha}"
-            if [ -n "$version" ]; then
-              echo "${IMAGE}:${version}"
-            fi
-            echo EOF
-            echo "source_sha=$source_sha"
-          } >> "$GITHUB_OUTPUT"
+        run: node scripts/determine-image-tags.mts
 
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -102,3 +70,17 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ steps.tags.outputs.source_sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Update latest tag
+        if: steps.tags.outputs.update_latest == 'true'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          tip="$(git rev-parse origin/main)"
+          if [ "$tip" != "${{ steps.tags.outputs.source_sha }}" ]; then
+            echo "main is ${tip}; leaving ${IMAGE}:latest unchanged"
+            exit 0
+          fi
+          docker buildx imagetools create \
+            --tag "${IMAGE}:latest" \
+            "${IMAGE}@${{ steps.push.outputs.digest }}"
