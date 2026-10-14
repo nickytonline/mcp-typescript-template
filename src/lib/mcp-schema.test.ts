@@ -1,3 +1,6 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vite-plus/test";
 import { Schema } from "effect";
 import { toMcpSchema } from "./mcp-schema.ts";
@@ -54,5 +57,23 @@ describe("toMcpSchema", () => {
     expect(() =>
       schema["~standard"].jsonSchema.input({ target: "openapi-3.0" }),
     ).toThrow("Unsupported MCP JSON Schema target");
+  });
+});
+
+const execFileAsync = promisify(execFile);
+
+describe("Node type stripping", () => {
+  it("imports mcp-schema.ts the same way npm run dev does", async () => {
+    const root = fileURLToPath(new URL("../..", import.meta.url));
+
+    await execFileAsync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        "await import('./src/lib/mcp-schema.ts')",
+      ],
+      { cwd: root },
+    );
   });
 });
