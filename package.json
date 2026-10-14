@@ -40,6 +40,7 @@
     "@typescript/native": "npm:typescript@^7.0.2",
     "concurrently": "^10.0.6",
     "conventional-changelog-conventionalcommits": "^10.4.1",
+    "conventional-changelog-writer": "^9.3.0",
     "semantic-release": "^25.0.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
@@ -54,6 +55,7 @@
     "yaml": "^2.9.1"
   },
   "overrides": {
+    "conventional-changelog-writer": "$conventional-changelog-writer",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
   }
 }
