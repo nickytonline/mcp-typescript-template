@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/config-conventional": "^21.2.3",
     "@modelcontextprotocol/client": "^2.2.0",
     "@oxlint/plugins": "1.88.0",
     "@semantic-release/changelog": "^7.0.0",
