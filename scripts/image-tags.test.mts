@@ -36,6 +36,7 @@ function git(repository: string, args: readonly string[]): string {
   return execFileSync("git", args, {
     cwd: repository,
     encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
     env: {
       ...process.env,
       GIT_AUTHOR_NAME: "Test",
