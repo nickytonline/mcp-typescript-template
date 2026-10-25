@@ -44,7 +44,7 @@
     "semantic-release": "^25.0.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
-    "vite-plus": "1.2.0"
+    "vite-plus": "1.4.0"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.1.1",
