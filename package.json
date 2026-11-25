@@ -43,8 +43,8 @@
     "conventional-changelog-writer": "^9.3.0",
     "semantic-release": "^25.0.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0",
-    "vite-plus": "1.2.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8000",
+    "vite-plus": "1.7.0"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.1.1",
@@ -56,6 +56,6 @@
   },
   "overrides": {
     "conventional-changelog-writer": "$conventional-changelog-writer",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@8.3.8000"
   }
 }
